@@ -1,0 +1,12 @@
+node_modules/
+.next/
+out/
+build/
+.DS_Store
+
+# Local env — never commit. Real keys live here.
+.env*.local
+.env
+
+*.tsbuildinfo
+next-env.d.ts
