@@ -9,14 +9,14 @@ import { OtpStep } from "@/components/steps/OtpStep";
 import { ProfileStep } from "@/components/steps/ProfileStep";
 import { DoneStep } from "@/components/steps/DoneStep";
 import { ApiError, getMe } from "@/lib/api";
-import { parseE164 } from "@/lib/phone";
+import type { AuthTarget } from "@/lib/authTarget";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@/lib/types";
 
 type Step =
   | { name: "boot" }
   | { name: "phone" }
-  | { name: "otp"; phone: string }
+  | { name: "otp"; target: AuthTarget }
   | { name: "loadingProfile" }
   | { name: "profile"; user: User }
   | { name: "done"; user: User; variant: "registered" | "already" }
@@ -24,8 +24,8 @@ type Step =
 
 export default function Page() {
   const [step, setStep] = useState<Step>({ name: "boot" });
-  // Remembered so "Change number" returns a pre-filled field, not a blank one.
-  const lastPhone = useRef<string | undefined>(undefined);
+  // Remembered so "Change number/email" returns a pre-filled field, not a blank one.
+  const lastTarget = useRef<AuthTarget | undefined>(undefined);
 
   /** GET /me is the single branch point: it decides form vs. "already registered". */
   const loadProfile = useCallback(async () => {
@@ -110,17 +110,17 @@ export default function Page() {
       <Card>
         {step.name === "phone" ? (
           <PhoneStep
-            initialPhone={lastPhone.current ? parseE164(lastPhone.current) : undefined}
-            onSent={(phone) => {
-              lastPhone.current = phone;
-              setStep({ name: "otp", phone });
+            initial={lastTarget.current}
+            onSent={(target) => {
+              lastTarget.current = target;
+              setStep({ name: "otp", target });
             }}
           />
         ) : null}
 
         {step.name === "otp" ? (
           <OtpStep
-            phone={step.phone}
+            target={step.target}
             onVerified={() => void loadProfile()}
             onChangeNumber={() => setStep({ name: "phone" })}
           />

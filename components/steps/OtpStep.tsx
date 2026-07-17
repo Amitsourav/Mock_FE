@@ -6,16 +6,16 @@ import { CardHeader } from "@/components/Card";
 import { OtpInput } from "@/components/OtpInput";
 import { supabase } from "@/lib/supabase";
 import { humanizeAuthError, logAuthError } from "@/lib/authErrors";
-import { formatE164ForDisplay } from "@/lib/phone";
+import { describeTarget, type AuthTarget } from "@/lib/authTarget";
 
 const RESEND_SECONDS = 30;
 
 export function OtpStep({
-  phone,
+  target,
   onVerified,
   onChangeNumber,
 }: {
-  phone: string;
+  target: AuthTarget;
   onVerified: () => void;
   onChangeNumber: () => void;
 }) {
@@ -48,11 +48,10 @@ export function OtpStep({
     setError(null);
     setNotice(null);
 
-    const { error: authError } = await supabase.auth.verifyOtp({
-      phone,
-      token: candidate,
-      type: "sms",
-    });
+    const { error: authError } =
+      target.channel === "phone"
+        ? await supabase.auth.verifyOtp({ phone: target.phone, token: candidate, type: "sms" })
+        : await supabase.auth.verifyOtp({ email: target.email, token: candidate, type: "email" });
 
     inFlight.current = false;
     setVerifying(false);
@@ -74,7 +73,10 @@ export function OtpStep({
     setError(null);
     setNotice(null);
 
-    const { error: authError } = await supabase.auth.signInWithOtp({ phone });
+    const { error: authError } =
+      target.channel === "phone"
+        ? await supabase.auth.signInWithOtp({ phone: target.phone })
+        : await supabase.auth.signInWithOtp({ email: target.email });
     setResending(false);
 
     if (authError) {
@@ -99,7 +101,7 @@ export function OtpStep({
           <>
             We sent a 6-digit code to{" "}
             <span className="whitespace-nowrap font-medium text-ink">
-              {formatE164ForDisplay(phone)}
+              {describeTarget(target)}
             </span>
             .
           </>
@@ -158,7 +160,7 @@ export function OtpStep({
 
       <div className="mt-4 flex items-center justify-between">
         <TextButton type="button" onClick={onChangeNumber} disabled={verifying}>
-          Change number
+          {target.channel === "phone" ? "Change number" : "Change email"}
         </TextButton>
 
         <TextButton
