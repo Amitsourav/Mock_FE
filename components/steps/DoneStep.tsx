@@ -56,14 +56,16 @@ export function DoneStep({ user, variant }: { user: User; variant: "registered" 
             <dd className="text-[15px] text-ink">{user.full_name}</dd>
           </div>
         ) : null}
-        <div className="flex items-baseline justify-between gap-4 py-1.5">
-          <dt className="text-[13px] text-ink-secondary">Mobile</dt>
-          <dd className="text-[15px] text-ink">{formatE164ForDisplay(user.phone)}</dd>
-        </div>
-        {user.target_country ? (
+        {user.email ? (
           <div className="flex items-baseline justify-between gap-4 py-1.5">
-            <dt className="text-[13px] text-ink-secondary">Applying to</dt>
-            <dd className="text-[15px] text-ink">{user.target_country}</dd>
+            <dt className="text-[13px] text-ink-secondary">Email</dt>
+            <dd className="text-[15px] text-ink">{user.email}</dd>
+          </div>
+        ) : null}
+        {user.phone ? (
+          <div className="flex items-baseline justify-between gap-4 py-1.5">
+            <dt className="text-[13px] text-ink-secondary">Mobile</dt>
+            <dd className="text-[15px] text-ink">{formatE164ForDisplay(user.phone)}</dd>
           </div>
         ) : null}
       </dl>

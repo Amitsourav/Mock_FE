@@ -1,47 +1,46 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/Button";
 import { CardHeader } from "@/components/Card";
 import { ReadOnlyField, SelectField, TextField } from "@/components/TextField";
-import { ApiError, getExams, updateProfile } from "@/lib/api";
-import { formatE164ForDisplay } from "@/lib/phone";
-import type { Exam, User } from "@/lib/types";
+import {
+  ApiError,
+  getCategoryExams,
+  getCountries,
+  getMockCategories,
+  getStates,
+  updateProfile,
+} from "@/lib/api";
+import {
+  COUNTRIES,
+  DEFAULT_COUNTRY,
+  digitsOnly,
+  findCountry,
+  formatNational,
+  toE164,
+  validatePhone,
+} from "@/lib/phone";
+import type { CatalogExam, RefItem, StateItem, User } from "@/lib/types";
 
-const TARGET_COUNTRIES = [
-  "Germany",
-  "Austria",
-  "Switzerland",
-  "Netherlands",
-  "France",
-  "Ireland",
-  "United Kingdom",
-  "United States",
-  "Canada",
-  "Australia",
-  "Other",
-];
-
-type Fields = {
-  full_name: string;
-  email: string;
-  address: string;
-  target_country: string;
-  target_examination_id: string;
+/** Which field a structured 422 code points at, so the message lands inline. */
+const ERROR_FIELD: Record<string, keyof FieldErrors> = {
+  invalid_phone: "phone",
+  invalid_state: "state_code",
+  invalid_exam: "catalog_exam_code",
+  exam_category_mismatch: "catalog_exam_code",
+  country_required: "target_country_code",
+  invalid_country: "target_country_code",
 };
 
-type FieldErrors = Partial<Record<keyof Fields, string>>;
-
-function validate(fields: Fields): FieldErrors {
-  const errors: FieldErrors = {};
-  if (!fields.full_name.trim()) errors.full_name = "Enter your full name.";
-  if (!fields.target_country) errors.target_country = "Select the country you're applying to.";
-  // Email is optional, but if given it should look like one.
-  if (fields.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email.trim())) {
-    errors.email = "Enter a valid email address, or leave it blank.";
-  }
-  return errors;
-}
+type FieldErrors = {
+  full_name?: string;
+  phone?: string;
+  state_code?: string;
+  mock_category_code?: string;
+  catalog_exam_code?: string;
+  target_country_code?: string;
+};
 
 export function ProfileStep({
   user,
@@ -52,62 +51,162 @@ export function ProfileStep({
   onCompleted: (updated: User) => void;
   onUnauthorized: () => void;
 }) {
-  // Seed from the server record: a partially-filled profile shouldn't come back empty.
-  const [fields, setFields] = useState<Fields>({
-    full_name: user.full_name ?? "",
-    email: user.email ?? "",
-    address: user.address ?? "",
-    target_country: user.target_country ?? "",
-    target_examination_id: user.target_examination_id ?? "",
-  });
+  // --- Reference data (dropdown options) -----------------------------------
+  const [states, setStates] = useState<StateItem[]>([]);
+  const [categories, setCategories] = useState<RefItem[]>([]);
+  const [countries, setCountries] = useState<RefItem[]>([]);
+  const [refsLoading, setRefsLoading] = useState(true);
+  const [refsError, setRefsError] = useState(false);
+
+  // The Exam dropdown depends on the chosen category and is fetched on demand.
+  const [exams, setExams] = useState<CatalogExam[]>([]);
+  const [examsLoading, setExamsLoading] = useState(false);
+  const [examsError, setExamsError] = useState(false);
+
+  // --- Form fields (seeded from any partial server record) -----------------
+  const [fullName, setFullName] = useState(user.full_name ?? "");
+  const [phoneIso, setPhoneIso] = useState(DEFAULT_COUNTRY.iso);
+  const [phoneNational, setPhoneNational] = useState("");
+  const [stateCode, setStateCode] = useState(user.state_code ?? "");
+  const [categoryCode, setCategoryCode] = useState(user.mock_category_code ?? "");
+  const [examCode, setExamCode] = useState("");
+  const [countryCode, setCountryCode] = useState("");
+
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [touched, setTouched] = useState<Partial<Record<keyof Fields, boolean>>>({});
-  const [exams, setExams] = useState<Exam[]>([]);
-  const [examsFailed, setExamsFailed] = useState(false);
+  const [touched, setTouched] = useState<Partial<Record<keyof FieldErrors, boolean>>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const phoneCountry = findCountry(phoneIso);
+  const selectedExam = exams.find((exam) => exam.code === examCode) ?? null;
+  const requiresCountry = selectedExam?.requires_country ?? false;
+
+  // Guards against a slow exam fetch landing after the user has moved on to
+  // another category — only the latest request may write state.
+  const examRequestId = useRef(0);
+
+  const loadReferences = useCallback(async () => {
+    setRefsLoading(true);
+    setRefsError(false);
+    try {
+      const [s, c, co] = await Promise.all([getStates(), getMockCategories(), getCountries()]);
+      setStates(s);
+      setCategories(c);
+      setCountries(co);
+    } catch (error) {
+      if (error instanceof ApiError && error.unauthorized) {
+        onUnauthorized();
+        return;
+      }
+      setRefsError(true);
+    } finally {
+      setRefsLoading(false);
+    }
+  }, [onUnauthorized]);
+
   useEffect(() => {
-    let active = true;
-    getExams()
+    void loadReferences();
+  }, [loadReferences]);
+
+  // When a category is chosen (or restored), fetch its exams. Category change
+  // always resets the dependent Exam + Country choices.
+  useEffect(() => {
+    if (!categoryCode) {
+      setExams([]);
+      return;
+    }
+    const requestId = ++examRequestId.current;
+    setExamsLoading(true);
+    setExamsError(false);
+    getCategoryExams(categoryCode)
       .then((list) => {
-        if (active) setExams(list);
+        if (requestId !== examRequestId.current) return; // a newer category won
+        setExams(list);
       })
       .catch((error: unknown) => {
-        if (!active) return;
+        if (requestId !== examRequestId.current) return;
         if (error instanceof ApiError && error.unauthorized) {
           onUnauthorized();
           return;
         }
-        // The exam field is optional — a failed list shouldn't block registration.
-        setExamsFailed(true);
+        setExams([]);
+        setExamsError(true);
+      })
+      .finally(() => {
+        if (requestId === examRequestId.current) setExamsLoading(false);
       });
-    return () => {
-      active = false;
-    };
-  }, [onUnauthorized]);
+  }, [categoryCode, onUnauthorized]);
 
-  const set = (key: keyof Fields) => (value: string) => {
-    setFields((prev) => ({ ...prev, [key]: value }));
+  function clearError(key: keyof FieldErrors) {
     setErrors((prev) => ({ ...prev, [key]: undefined }));
     setSubmitError(null);
-  };
+  }
 
-  const blur = (key: keyof Fields) => () => {
+  function changeCategory(next: string) {
+    setCategoryCode(next);
+    // The old exam belongs to the old category; the country belongs to the old
+    // exam. Both are now meaningless — reset them so the cascade restarts clean.
+    setExamCode("");
+    setCountryCode("");
+    clearError("mock_category_code");
+    setErrors((prev) => ({ ...prev, catalog_exam_code: undefined, target_country_code: undefined }));
+  }
+
+  function changeExam(next: string) {
+    setExamCode(next);
+    const exam = exams.find((e) => e.code === next) ?? null;
+    // Pre-fill the default country (editable) when the exam names one; otherwise
+    // start empty so a required country is a deliberate choice.
+    setCountryCode(exam?.requires_country ? exam.default_country_code ?? "" : "");
+    clearError("catalog_exam_code");
+    setErrors((prev) => ({ ...prev, target_country_code: undefined }));
+  }
+
+  function validate(): FieldErrors {
+    const next: FieldErrors = {};
+    if (!fullName.trim()) next.full_name = "Enter your full name.";
+    const phoneError = validatePhone(phoneCountry, phoneNational);
+    if (phoneError) next.phone = phoneError;
+    if (!stateCode) next.state_code = "Select your state.";
+    if (!categoryCode) next.mock_category_code = "Select what you're preparing for.";
+    if (!examCode) next.catalog_exam_code = "Select the exam you're targeting.";
+    if (requiresCountry && !countryCode) {
+      next.target_country_code = "Select a target country for this exam.";
+    }
+    return next;
+  }
+
+  const canSubmit =
+    !refsLoading &&
+    !refsError &&
+    fullName.trim() !== "" &&
+    !validatePhone(phoneCountry, phoneNational) &&
+    stateCode !== "" &&
+    categoryCode !== "" &&
+    examCode !== "" &&
+    (!requiresCountry || countryCode !== "");
+
+  const errorFor = (key: keyof FieldErrors) => (touched[key] ? errors[key] : undefined);
+
+  const markTouched = (key: keyof FieldErrors) => () => {
     setTouched((prev) => ({ ...prev, [key]: true }));
-    setErrors(validate({ ...fields }));
+    setErrors(validate());
   };
-
-  const errorFor = (key: keyof Fields) => (touched[key] ? errors[key] : undefined);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    const found = validate(fields);
+    const found = validate();
     setErrors(found);
-    setTouched({ full_name: true, email: true, address: true, target_country: true });
+    setTouched({
+      full_name: true,
+      phone: true,
+      state_code: true,
+      mock_category_code: true,
+      catalog_exam_code: true,
+      target_country_code: true,
+    });
     if (Object.keys(found).length > 0) {
-      // Send focus to the first problem so keyboard users aren't hunting for it.
-      const firstKey = (Object.keys(found) as (keyof Fields)[])[0];
+      const firstKey = (Object.keys(found) as (keyof FieldErrors)[])[0];
       document.querySelector<HTMLElement>(`[data-field="${firstKey}"]`)?.focus();
       return;
     }
@@ -116,24 +215,49 @@ export function ProfileStep({
     setSubmitError(null);
     try {
       const updated = await updateProfile({
-        full_name: fields.full_name.trim(),
-        target_country: fields.target_country,
-        email: fields.email.trim() || null,
-        address: fields.address.trim() || null,
-        target_examination_id: fields.target_examination_id || null,
+        full_name: fullName.trim(),
+        phone: toE164(phoneCountry, phoneNational),
+        state_code: stateCode,
+        mock_category_code: categoryCode,
+        catalog_exam_code: examCode,
+        target_country_code: requiresCountry ? countryCode : null,
       });
       onCompleted(updated);
     } catch (error) {
-      // Never wipe the form — the user's typing survives every failure path.
+      // Never wipe the form — the user's input survives every failure path.
       if (error instanceof ApiError && error.unauthorized) {
         onUnauthorized();
         return;
       }
-      setSubmitError(
-        error instanceof ApiError ? error.message : "Something went wrong. Please try again."
-      );
+      if (error instanceof ApiError && error.code && ERROR_FIELD[error.code]) {
+        // A structured 422: land the message on the field it belongs to.
+        const field = ERROR_FIELD[error.code];
+        setErrors((prev) => ({ ...prev, [field]: error.message }));
+        setTouched((prev) => ({ ...prev, [field]: true }));
+        document.querySelector<HTMLElement>(`[data-field="${field}"]`)?.focus();
+      } else {
+        setSubmitError(
+          error instanceof ApiError ? error.message : "Something went wrong. Please try again."
+        );
+      }
       setSubmitting(false);
     }
+  }
+
+  // Reference data is required for the form to function; a load failure gets a
+  // retry rather than a half-populated set of empty dropdowns.
+  if (refsError) {
+    return (
+      <div className="animate-step-in text-center">
+        <CardHeader
+          title="Couldn't load the form"
+          subtitle="We couldn't reach the server to load your options. Please try again."
+        />
+        <Button type="button" onClick={() => void loadReferences()}>
+          Try again
+        </Button>
+      </div>
+    );
   }
 
   return (
@@ -143,15 +267,18 @@ export function ProfileStep({
         subtitle="A few details so we can match you to the right mock exam."
       />
 
-      <div className="flex flex-col gap-5">
-        <ReadOnlyField label="Mobile number" value={formatE164ForDisplay(user.phone)} />
+      <fieldset disabled={refsLoading} className="flex flex-col gap-5">
+        {user.email ? <ReadOnlyField label="Email" value={user.email} /> : null}
 
         <TextField
           label="Full name"
           data-field="full_name"
-          value={fields.full_name}
-          onChange={(event) => set("full_name")(event.target.value)}
-          onBlur={blur("full_name")}
+          value={fullName}
+          onChange={(event) => {
+            setFullName(event.target.value);
+            clearError("full_name");
+          }}
+          onBlur={markTouched("full_name")}
           error={errorFor("full_name")}
           disabled={submitting}
           type="text"
@@ -160,68 +287,182 @@ export function ProfileStep({
           autoFocus
         />
 
-        <TextField
-          label="Email"
-          data-field="email"
-          optional
-          value={fields.email}
-          onChange={(event) => set("email")(event.target.value)}
-          onBlur={blur("email")}
-          error={errorFor("email")}
-          disabled={submitting}
-          type="email"
-          inputMode="email"
-          autoComplete="email"
-        />
-
-        <TextField
-          label="Address"
-          data-field="address"
-          optional
-          value={fields.address}
-          onChange={(event) => set("address")(event.target.value)}
-          onBlur={blur("address")}
-          disabled={submitting}
-          type="text"
-          autoComplete="street-address"
-        />
+        {/* Phone: country-code select + national number, submitted as E.164. */}
+        <div>
+          <label
+            htmlFor="phone-national"
+            className="mb-2 block text-[13px] font-medium text-ink-secondary"
+          >
+            Mobile number
+          </label>
+          <div className="flex gap-2">
+            <div className="relative shrink-0">
+              <label htmlFor="phone-dial" className="sr-only">
+                Country calling code
+              </label>
+              <select
+                id="phone-dial"
+                value={phoneIso}
+                onChange={(event) => {
+                  setPhoneIso(event.target.value);
+                  clearError("phone");
+                }}
+                disabled={submitting}
+                className={`h-[52px] w-[104px] cursor-pointer appearance-none rounded-[12px] border bg-surface-field pl-4 pr-7 text-[17px] text-ink transition-[border-color] duration-200 ease-out focus:border-brand disabled:cursor-not-allowed disabled:opacity-50 ${
+                  errorFor("phone") ? "border-error" : "border-hairline"
+                }`}
+              >
+                {COUNTRIES.map((option) => (
+                  <option key={option.iso} value={option.iso}>
+                    {option.flag} {option.dial}
+                  </option>
+                ))}
+              </select>
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 12 12"
+                className="pointer-events-none absolute right-3 top-1/2 h-3 w-3 -translate-y-1/2 text-ink-secondary"
+              >
+                <path
+                  d="M2 4.5 6 8.5 10 4.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            <input
+              id="phone-national"
+              data-field="phone"
+              value={formatNational(phoneCountry, phoneNational)}
+              onChange={(event) => {
+                setPhoneNational(digitsOnly(event.target.value).slice(0, 15));
+                clearError("phone");
+              }}
+              onBlur={markTouched("phone")}
+              disabled={submitting}
+              type="tel"
+              inputMode="numeric"
+              autoComplete="tel-national"
+              placeholder={phoneCountry.iso === "IN" ? "98765 43210" : "Mobile number"}
+              aria-invalid={errorFor("phone") ? true : undefined}
+              aria-describedby={errorFor("phone") ? "phone-error" : undefined}
+              className={`h-[52px] w-full min-w-0 rounded-[12px] border bg-surface-field px-4 text-[17px] text-ink transition-[border-color] duration-200 ease-out placeholder:text-ink-secondary/70 focus:border-brand disabled:cursor-not-allowed disabled:opacity-50 ${
+                errorFor("phone") ? "border-error" : "border-hairline"
+              }`}
+            />
+          </div>
+          {errorFor("phone") ? (
+            <p id="phone-error" role="alert" className="mt-2 flex items-start gap-1.5 text-[13px] text-error">
+              <span aria-hidden="true" className="mt-px font-semibold leading-none">
+                !
+              </span>
+              <span>{errorFor("phone")}</span>
+            </p>
+          ) : null}
+        </div>
 
         <SelectField
-          label="Target country"
-          data-field="target_country"
-          value={fields.target_country}
-          onChange={(event) => set("target_country")(event.target.value)}
-          onBlur={blur("target_country")}
-          error={errorFor("target_country")}
+          label="State"
+          data-field="state_code"
+          value={stateCode}
+          onChange={(event) => {
+            setStateCode(event.target.value);
+            clearError("state_code");
+          }}
+          onBlur={markTouched("state_code")}
+          error={errorFor("state_code")}
           disabled={submitting}
           required
         >
           <option value="" disabled>
-            Select a country
+            Select your state
           </option>
-          {TARGET_COUNTRIES.map((name) => (
-            <option key={name} value={name}>
-              {name}
+          {states.map((item) => (
+            <option key={item.code} value={item.code}>
+              {item.name}
+            </option>
+          ))}
+        </SelectField>
+
+        <SelectField
+          label="What are you preparing for?"
+          data-field="mock_category_code"
+          value={categoryCode}
+          onChange={(event) => changeCategory(event.target.value)}
+          onBlur={markTouched("mock_category_code")}
+          error={errorFor("mock_category_code")}
+          disabled={submitting}
+          required
+        >
+          <option value="" disabled>
+            Select a mock type
+          </option>
+          {categories.map((item) => (
+            <option key={item.code} value={item.code}>
+              {item.name}
             </option>
           ))}
         </SelectField>
 
         <SelectField
           label="Exam you're targeting"
-          optional
-          value={fields.target_examination_id}
-          onChange={(event) => set("target_examination_id")(event.target.value)}
-          disabled={submitting || examsFailed || exams.length === 0}
-          hint={examsFailed ? "We couldn't load the exam list. You can still register." : undefined}
+          data-field="catalog_exam_code"
+          value={examCode}
+          onChange={(event) => changeExam(event.target.value)}
+          onBlur={markTouched("catalog_exam_code")}
+          error={errorFor("catalog_exam_code")}
+          // Disabled until a category is chosen and its exams have loaded.
+          disabled={submitting || !categoryCode || examsLoading}
+          hint={
+            !categoryCode
+              ? "Choose what you're preparing for first."
+              : examsLoading
+                ? "Loading exams…"
+                : examsError
+                  ? "We couldn't load exams. Change the mock type to retry."
+                  : undefined
+          }
+          required
         >
-          <option value="">{examsFailed ? "Unavailable" : "No preference"}</option>
+          <option value="" disabled>
+            {examsLoading ? "Loading exams…" : "Select an exam"}
+          </option>
           {exams.map((exam) => (
-            <option key={exam.id} value={exam.id}>
-              {exam.name} ({exam.code})
+            <option key={exam.code} value={exam.code}>
+              {exam.name}
             </option>
           ))}
         </SelectField>
-      </div>
+
+        {/* Country only exists for exams that require it. */}
+        {requiresCountry ? (
+          <SelectField
+            label="Target country"
+            data-field="target_country_code"
+            value={countryCode}
+            onChange={(event) => {
+              setCountryCode(event.target.value);
+              clearError("target_country_code");
+            }}
+            onBlur={markTouched("target_country_code")}
+            error={errorFor("target_country_code")}
+            disabled={submitting}
+            required
+          >
+            <option value="" disabled>
+              Select a country
+            </option>
+            {countries.map((item) => (
+              <option key={item.code} value={item.code}>
+                {item.name}
+              </option>
+            ))}
+          </SelectField>
+        ) : null}
+      </fieldset>
 
       {submitError ? (
         <p role="alert" className="mt-5 flex items-start gap-1.5 text-[13px] text-error">
@@ -233,7 +474,12 @@ export function ProfileStep({
       ) : null}
 
       <div className="mt-6">
-        <Button type="submit" loading={submitting} loadingLabel="Submitting…">
+        <Button
+          type="submit"
+          disabled={!canSubmit}
+          loading={submitting}
+          loadingLabel="Submitting…"
+        >
           Complete registration
         </Button>
       </div>
