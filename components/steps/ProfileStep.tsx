@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/Button";
 import { CardHeader } from "@/components/Card";
 import { ReadOnlyField, SelectField, TextField } from "@/components/TextField";
@@ -58,10 +58,10 @@ export function ProfileStep({
   const [refsLoading, setRefsLoading] = useState(true);
   const [refsError, setRefsError] = useState(false);
 
-  // The Exam dropdown depends on the chosen category and is fetched on demand.
-  const [exams, setExams] = useState<CatalogExam[]>([]);
-  const [examsLoading, setExamsLoading] = useState(false);
-  const [examsError, setExamsError] = useState(false);
+  // Every category's exams, prefetched once with the other reference data so
+  // switching category filters client-side (instant) instead of a slow
+  // per-selection round trip. The dataset is tiny (~4 categories, ~22 exams).
+  const [examsByCategory, setExamsByCategory] = useState<Record<string, CatalogExam[]>>({});
 
   // --- Form fields (seeded from any partial server record) -----------------
   const [fullName, setFullName] = useState(user.full_name ?? "");
@@ -78,12 +78,10 @@ export function ProfileStep({
   const [submitting, setSubmitting] = useState(false);
 
   const phoneCountry = findCountry(phoneIso);
+  // Instant, synchronous filter — no fetch on category change.
+  const exams = examsByCategory[categoryCode] ?? [];
   const selectedExam = exams.find((exam) => exam.code === examCode) ?? null;
   const requiresCountry = selectedExam?.requires_country ?? false;
-
-  // Guards against a slow exam fetch landing after the user has moved on to
-  // another category — only the latest request may write state.
-  const examRequestId = useRef(0);
 
   const loadReferences = useCallback(async () => {
     setRefsLoading(true);
@@ -93,6 +91,14 @@ export function ProfileStep({
       setStates(s);
       setCategories(c);
       setCountries(co);
+      // Prefetch every category's exams in parallel (tiny dataset) and key them
+      // by category code, so selecting a category is a synchronous filter later.
+      const examLists = await Promise.all(c.map((category) => getCategoryExams(category.code)));
+      const byCategory: Record<string, CatalogExam[]> = {};
+      c.forEach((category, index) => {
+        byCategory[category.code] = examLists[index];
+      });
+      setExamsByCategory(byCategory);
     } catch (error) {
       if (error instanceof ApiError && error.unauthorized) {
         onUnauthorized();
@@ -107,35 +113,6 @@ export function ProfileStep({
   useEffect(() => {
     void loadReferences();
   }, [loadReferences]);
-
-  // When a category is chosen (or restored), fetch its exams. Category change
-  // always resets the dependent Exam + Country choices.
-  useEffect(() => {
-    if (!categoryCode) {
-      setExams([]);
-      return;
-    }
-    const requestId = ++examRequestId.current;
-    setExamsLoading(true);
-    setExamsError(false);
-    getCategoryExams(categoryCode)
-      .then((list) => {
-        if (requestId !== examRequestId.current) return; // a newer category won
-        setExams(list);
-      })
-      .catch((error: unknown) => {
-        if (requestId !== examRequestId.current) return;
-        if (error instanceof ApiError && error.unauthorized) {
-          onUnauthorized();
-          return;
-        }
-        setExams([]);
-        setExamsError(true);
-      })
-      .finally(() => {
-        if (requestId === examRequestId.current) setExamsLoading(false);
-      });
-  }, [categoryCode, onUnauthorized]);
 
   function clearError(key: keyof FieldErrors) {
     setErrors((prev) => ({ ...prev, [key]: undefined }));
@@ -267,7 +244,10 @@ export function ProfileStep({
         subtitle="A few details so we can match you to the right mock exam."
       />
 
-      <fieldset disabled={refsLoading} className="flex flex-col gap-5">
+      {/* No fieldset-wide disable: Full name and phone don't need reference data,
+          so they stay interactive from first render. Only the reference-backed
+          dropdowns below gate on refsLoading. */}
+      <fieldset className="flex flex-col gap-5">
         {user.email ? <ReadOnlyField label="Email" value={user.email} /> : null}
 
         <TextField
@@ -374,11 +354,12 @@ export function ProfileStep({
           }}
           onBlur={markTouched("state_code")}
           error={errorFor("state_code")}
-          disabled={submitting}
+          disabled={submitting || refsLoading}
+          hint={refsLoading ? "Loading options…" : undefined}
           required
         >
           <option value="" disabled>
-            Select your state
+            {refsLoading ? "Loading…" : "Select your state"}
           </option>
           {states.map((item) => (
             <option key={item.code} value={item.code}>
@@ -394,11 +375,12 @@ export function ProfileStep({
           onChange={(event) => changeCategory(event.target.value)}
           onBlur={markTouched("mock_category_code")}
           error={errorFor("mock_category_code")}
-          disabled={submitting}
+          disabled={submitting || refsLoading}
+          hint={refsLoading ? "Loading options…" : undefined}
           required
         >
           <option value="" disabled>
-            Select a mock type
+            {refsLoading ? "Loading…" : "Select a mock type"}
           </option>
           {categories.map((item) => (
             <option key={item.code} value={item.code}>
@@ -414,21 +396,13 @@ export function ProfileStep({
           onChange={(event) => changeExam(event.target.value)}
           onBlur={markTouched("catalog_exam_code")}
           error={errorFor("catalog_exam_code")}
-          // Disabled until a category is chosen and its exams have loaded.
-          disabled={submitting || !categoryCode || examsLoading}
-          hint={
-            !categoryCode
-              ? "Choose what you're preparing for first."
-              : examsLoading
-                ? "Loading exams…"
-                : examsError
-                  ? "We couldn't load exams. Change the mock type to retry."
-                  : undefined
-          }
+          // Disabled until a category is chosen; its exams are already prefetched.
+          disabled={submitting || !categoryCode}
+          hint={!categoryCode ? "Choose what you're preparing for first." : undefined}
           required
         >
           <option value="" disabled>
-            {examsLoading ? "Loading exams…" : "Select an exam"}
+            Select an exam
           </option>
           {exams.map((exam) => (
             <option key={exam.code} value={exam.code}>
@@ -449,7 +423,7 @@ export function ProfileStep({
             }}
             onBlur={markTouched("target_country_code")}
             error={errorFor("target_country_code")}
-            disabled={submitting}
+            disabled={submitting || refsLoading}
             required
           >
             <option value="" disabled>
