@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Clock } from "lucide-react";
 import { Button } from "@/components/Button";
 import { CardHeader } from "@/components/Card";
 import { FieldError } from "@/components/TextField";
@@ -8,14 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { humanizeAuthError, logAuthError } from "@/lib/authErrors";
 import type { AuthTarget } from "@/lib/authTarget";
 import { validateEmail } from "@/lib/email";
-import {
-  DEFAULT_COUNTRY,
-  digitsOnly,
-  formatNational,
-  parseE164,
-  toE164,
-  validatePhone,
-} from "@/lib/phone";
+import { DEFAULT_COUNTRY, parseE164, toE164, validatePhone } from "@/lib/phone";
 
 // India is the only phone origin here (spec: "+91 prefix + 10 digits"). The
 // multi-country picker still lives in lib/phone if the intake ever widens again.
@@ -38,9 +32,10 @@ export function PhoneStep({
 }) {
   const [channel, setChannel] = useState<Channel>(initial?.channel ?? "email");
   const [email, setEmail] = useState(initial?.channel === "email" ? initial.email : "");
-  const [national, setNational] = useState(
-    initial?.channel === "phone" ? parseE164(initial.phone)?.national ?? "" : ""
-  );
+  // Phone entry is disabled (coming-soon notice), so there is no field to edit —
+  // this stays a derived value. The plumbing below is kept so re-enabling phone
+  // is only a matter of restoring the input JSX.
+  const national = initial?.channel === "phone" ? parseE164(initial.phone)?.national ?? "" : "";
   const [touched, setTouched] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -64,6 +59,9 @@ export function PhoneStep({
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+    // Phone is not live yet — the tab shows a notice instead of an input, but
+    // guard here too so an Enter keystroke can't slip through to Supabase.
+    if (channel === "phone") return;
     setTouched(true);
     setSubmitError(null);
     if (validationError) return;
@@ -122,77 +120,73 @@ export function PhoneStep({
         })}
       </div>
 
-      <div>
-        <label
-          htmlFor="credential"
-          className="mb-2 block text-[13px] font-medium text-ink-secondary"
-        >
-          {channel === "email" ? "Email address" : "Mobile number"}
-        </label>
-
-        {channel === "email" ? (
-          <input
-            id="credential"
-            key="email"
-            value={email}
-            onChange={(event) => {
-              setEmail(event.target.value);
-              setSubmitError(null);
-            }}
-            onBlur={() => setTouched(true)}
-            disabled={sending}
-            type="email"
-            inputMode="email"
-            autoComplete="email"
-            autoFocus
-            placeholder="you@example.com"
-            aria-invalid={shownError ? true : undefined}
-            aria-describedby={shownError ? "credential-error" : undefined}
-            className={inputClass}
-          />
-        ) : (
-          <div className="flex gap-2">
-            {/* Fixed +91 — a static prefix, not the old country dropdown. */}
-            <div className="flex h-[52px] shrink-0 items-center gap-1.5 rounded-[12px] border border-hairline bg-surface-field px-4 text-[17px] text-ink">
-              <span aria-hidden="true">{INDIA.flag}</span>
-              <span>{INDIA.dial}</span>
-            </div>
+      {channel === "email" ? (
+        <>
+          <div>
+            <label
+              htmlFor="credential"
+              className="mb-2 block text-[13px] font-medium text-ink-secondary"
+            >
+              Email address
+            </label>
             <input
               id="credential"
-              key="phone"
-              value={formatNational(INDIA, national)}
+              value={email}
               onChange={(event) => {
-                setNational(digitsOnly(event.target.value).slice(0, 10));
+                setEmail(event.target.value);
                 setSubmitError(null);
               }}
               onBlur={() => setTouched(true)}
               disabled={sending}
-              type="tel"
-              inputMode="numeric"
-              autoComplete="tel-national"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
               autoFocus
-              placeholder="98765 43210"
+              placeholder="you@example.com"
               aria-invalid={shownError ? true : undefined}
               aria-describedby={shownError ? "credential-error" : undefined}
               className={inputClass}
             />
+            {shownError ? <FieldError id="credential-error">{shownError}</FieldError> : null}
           </div>
-        )}
 
-        {shownError ? <FieldError id="credential-error">{shownError}</FieldError> : null}
-      </div>
+          <div className="mt-6">
+            <Button type="submit" disabled={!canSubmit} loading={sending} loadingLabel="Sending…">
+              Send OTP
+            </Button>
+          </div>
 
-      <div className="mt-6">
-        <Button type="submit" disabled={!canSubmit} loading={sending} loadingLabel="Sending…">
-          Send OTP
-        </Button>
-      </div>
+          <p className="mt-4 text-center text-[13px] leading-relaxed text-ink-secondary">
+            We&apos;ll email you a one-time code. Check your spam folder if it doesn&apos;t arrive.
+          </p>
+        </>
+      ) : (
+        // Phone sign-in is not live yet. Rather than a dead input behind a
+        // button that would only fail, tell the user plainly and point them
+        // straight back to the channel that works.
+        <>
+          <div
+            role="status"
+            className="flex flex-col items-center gap-3 rounded-[12px] border border-hairline bg-surface-field px-5 py-7 text-center"
+          >
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-brand/10 text-brand">
+              <Clock className="size-5" strokeWidth={2} aria-hidden="true" />
+            </span>
+            <div>
+              <p className="text-[15px] font-medium text-ink">Phone sign-in is coming soon</p>
+              <p className="mt-1 text-[13px] leading-relaxed text-ink-secondary">
+                We&apos;re still setting up SMS sign-in. For now, please use your email to continue.
+              </p>
+            </div>
+          </div>
 
-      <p className="mt-4 text-center text-[13px] leading-relaxed text-ink-secondary">
-        {channel === "phone"
-          ? "By continuing you agree to receive a one-time SMS. Message rates may apply."
-          : "We'll email you a one-time code. Check your spam folder if it doesn't arrive."}
-      </p>
+          <div className="mt-6">
+            <Button type="button" onClick={() => switchChannel("email")}>
+              Use email instead
+            </Button>
+          </div>
+        </>
+      )}
     </form>
   );
 }
