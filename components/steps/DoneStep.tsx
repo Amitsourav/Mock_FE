@@ -1,5 +1,6 @@
 "use client";
 
+import { TextButton } from "@/components/Button";
 import { formatE164ForDisplay } from "@/lib/phone";
 import type { User } from "@/lib/types";
 
@@ -27,7 +28,15 @@ function SuccessMark() {
  * The two terminal screens. `variant` is driven by whether we just submitted a
  * profile or found one already complete — the copy is the only difference.
  */
-export function DoneStep({ user, variant }: { user: User; variant: "registered" | "already" }) {
+export function DoneStep({
+  user,
+  variant,
+  onLogout,
+}: {
+  user: User;
+  variant: "registered" | "already";
+  onLogout: () => void;
+}) {
   const title =
     variant === "registered" ? "Thanks for registering." : "You're already registered.";
   const body =
@@ -69,6 +78,12 @@ export function DoneStep({ user, variant }: { user: User; variant: "registered" 
           </div>
         ) : null}
       </dl>
+
+      <div className="mt-6 w-full border-t border-hairline pt-4">
+        <TextButton type="button" onClick={onLogout}>
+          Log out
+        </TextButton>
+      </div>
     </div>
   );
 }

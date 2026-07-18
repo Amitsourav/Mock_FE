@@ -69,6 +69,12 @@ export default function Page() {
     setStep({ name: "phone" });
   }, []);
 
+  const handleLogout = useCallback(async () => {
+    lastTarget.current = undefined;
+    await supabase.auth.signOut();
+    setStep({ name: "phone" });
+  }, []);
+
   if (step.name === "boot" || step.name === "loadingProfile") {
     return (
       <AuthLayout>
@@ -134,7 +140,13 @@ export default function Page() {
           />
         ) : null}
 
-        {step.name === "done" ? <DoneStep user={step.user} variant={step.variant} /> : null}
+        {step.name === "done" ? (
+          <DoneStep
+            user={step.user}
+            variant={step.variant}
+            onLogout={() => void handleLogout()}
+          />
+        ) : null}
       </Card>
     </AuthLayout>
   );
