@@ -25,6 +25,15 @@
   --success: #248a3d;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
 
+  /* Error-type palette (see lib/errorTypes.ts). Always paired with an icon +
+     label, so hue is reinforcement, not the sole channel. Tuned for >= 3:1
+     against the card surface. */
+  --et-correct: #248a3d;
+  --et-careless: #b26a00;
+  --et-conceptual: #d70015;
+  --et-guess: #8944ab;
+  --et-unattempted: #8e8e93;
+
   /* --- shadcn compatibility -------------------------------------------------
      Anything added later via `npx shadcn add …` expects these names. Aliasing
      them onto the tokens above means generated components inherit our palette
@@ -73,6 +82,13 @@
     --error: #ff453a;
     --success: #30d158;
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.5);
+
+    /* Lifted for legibility on the dark card surface. */
+    --et-correct: #30d158;
+    --et-careless: #ff9f0a;
+    --et-conceptual: #ff453a;
+    --et-guess: #bf5af2;
+    --et-unattempted: #98989d;
 
     /* The shadcn aliases above are declared with var(), so they follow these
        automatically — only the two that resolve to literals need restating. */
@@ -191,6 +207,49 @@ body {
 
 .animate-spin-slow {
   animation: spin 700ms linear infinite;
+}
+
+/* --- Modal / app motion ---------------------------------------------------- */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 180ms ease-out;
+}
+
+.animate-modal-in {
+  animation: modal-in 220ms ease-out;
+}
+
+.animate-skeleton {
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
 }
 
 /* --- Brand panel motion ---------------------------------------------------

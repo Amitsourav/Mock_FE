@@ -1,5 +1,22 @@
 import { getAccessToken } from "./supabase";
-import type { CatalogExam, ProfilePayload, RefItem, StateItem, User } from "./types";
+import type {
+  AttemptDetail,
+  AttemptListItem,
+  CatalogExam,
+  ConceptMastery,
+  DashboardInsight,
+  DashboardSummary,
+  MockTest,
+  MockTestGroups,
+  ProfilePayload,
+  RefItem,
+  SkillStat,
+  StateItem,
+  StrategyData,
+  StreamOut,
+  StreamPayload,
+  User,
+} from "./types";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -122,4 +139,66 @@ export function getCategoryExams(categoryCode: string) {
 
 export function getCountries() {
   return request<RefItem[]>("/reference/countries");
+}
+
+// --- Exam stream -----------------------------------------------------------
+
+/** The user's current stream, or null if none has been selected. */
+export function getStream() {
+  return request<StreamOut | null>("/me/stream");
+}
+
+/** Switch stream (append-only server-side). 422 → structured detail on bad input. */
+export function switchStream(payload: StreamPayload) {
+  return request<StreamOut>("/me/stream", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+// --- Mock tests ------------------------------------------------------------
+
+/** Mocks for the current stream, pre-grouped. 409 {code:"no_stream"} if none selected. */
+export function getMockTests() {
+  return request<MockTestGroups>("/mock-tests");
+}
+
+export function getMockTest(id: string) {
+  return request<MockTest>(`/mock-tests/${encodeURIComponent(id)}`);
+}
+
+// --- Dashboard -------------------------------------------------------------
+
+export function getDashboardSummary() {
+  return request<DashboardSummary>("/dashboard/summary");
+}
+
+/** Attempts oldest→newest, ready for the trend line. */
+export function getAttempts() {
+  return request<AttemptListItem[]>("/dashboard/attempts");
+}
+
+/** Skills weakest-first, for the radar / weakness list. */
+export function getSkills() {
+  return request<SkillStat[]>("/dashboard/skills");
+}
+
+export function getAttemptDetail(id: string) {
+  return request<AttemptDetail>(`/dashboard/attempts/${encodeURIComponent(id)}`);
+}
+
+// --- AI insight layer ------------------------------------------------------
+
+/** The headline story. Null when the user has no attempts yet. */
+export function getInsight() {
+  return request<DashboardInsight | null>("/dashboard/insight");
+}
+
+/** Concept mastery, weakest-first (already ordered by gap_priority). */
+export function getConcepts() {
+  return request<ConceptMastery[]>("/dashboard/concepts");
+}
+
+export function getStrategy() {
+  return request<StrategyData>("/dashboard/strategy");
 }

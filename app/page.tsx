@@ -8,6 +8,7 @@ import { PhoneStep } from "@/components/steps/PhoneStep";
 import { OtpStep } from "@/components/steps/OtpStep";
 import { ProfileStep } from "@/components/steps/ProfileStep";
 import { DoneStep } from "@/components/steps/DoneStep";
+import { AppShell } from "@/components/app/AppShell";
 import { ApiError, getMe } from "@/lib/api";
 import type { AuthTarget } from "@/lib/authTarget";
 import { supabase } from "@/lib/supabase";
@@ -20,6 +21,7 @@ type Step =
   | { name: "loadingProfile" }
   | { name: "profile"; user: User }
   | { name: "done"; user: User; variant: "registered" | "already" }
+  | { name: "app"; user: User }
   | { name: "error"; message: string };
 
 export default function Page() {
@@ -32,10 +34,10 @@ export default function Page() {
     setStep({ name: "loadingProfile" });
     try {
       const user = await getMe();
+      // A completed profile lands straight in the app; an incomplete one goes to
+      // the registration form (which is untouched by this change).
       setStep(
-        user.profile_completed
-          ? { name: "done", user, variant: "already" }
-          : { name: "profile", user }
+        user.profile_completed ? { name: "app", user } : { name: "profile", user }
       );
     } catch (error) {
       if (error instanceof ApiError && error.unauthorized) {
@@ -86,6 +88,17 @@ export default function Page() {
           Loading…
         </p>
       </AuthLayout>
+    );
+  }
+
+  // The post-login app takes the whole viewport — not the centred auth card.
+  if (step.name === "app") {
+    return (
+      <AppShell
+        user={step.user}
+        onLogout={() => void handleLogout()}
+        onUnauthorized={() => void handleUnauthorized()}
+      />
     );
   }
 
