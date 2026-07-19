@@ -4,17 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Skeleton } from "@/components/app/Skeleton";
 import { StreamDiscovery } from "@/components/app/StreamDiscovery";
 import { MockHub } from "@/components/app/mocks/MockHub";
-import {
-  ApiError,
-  getAttempts,
-  getConcepts,
-  getDashboardSummary,
-  getInsight,
-  getMockTests,
-} from "@/lib/api";
+import { ApiError, getAttempts, getDashboardSummary, getInsight, getMockTests } from "@/lib/api";
 import type {
   AttemptListItem,
-  ConceptMastery,
   DashboardInsight,
   DashboardSummary,
   MockTestGroups,
@@ -76,7 +68,6 @@ export function MockTestView({
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [attempts, setAttempts] = useState<AttemptListItem[]>([]);
   const [insight, setInsight] = useState<DashboardInsight | null>(null);
-  const [concepts, setConcepts] = useState<ConceptMastery[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [noStream, setNoStream] = useState(false);
@@ -89,16 +80,14 @@ export function MockTestView({
       const g = await getMockTests();
       setGroups(g);
       // Analytics are best-effort: a failure here still leaves a usable catalogue.
-      const [s, a, ins, con] = await Promise.allSettled([
+      const [s, a, ins] = await Promise.allSettled([
         getDashboardSummary(),
         getAttempts(),
         getInsight(),
-        getConcepts(),
       ]);
       setSummary(s.status === "fulfilled" ? s.value : null);
       setAttempts(a.status === "fulfilled" ? a.value : []);
       setInsight(ins.status === "fulfilled" ? ins.value : null);
-      setConcepts(con.status === "fulfilled" ? con.value : []);
     } catch (err) {
       if (err instanceof ApiError && err.unauthorized) {
         onUnauthorized();
@@ -168,7 +157,6 @@ export function MockTestView({
       summary={summary}
       attempts={attempts}
       insight={insight}
-      concepts={concepts}
       onChangeStream={onOpenPicker}
       onGoToDashboard={onGoToDashboard}
     />

@@ -16,7 +16,6 @@ import { MockCard } from "@/components/app/mocks/MockCard";
 import { compactNumber, formatDate, formatDuration, formatPct } from "@/lib/format";
 import type {
   AttemptListItem,
-  ConceptMastery,
   DashboardInsight,
   DashboardSummary,
   MockTest,
@@ -37,7 +36,6 @@ export function MockHub({
   summary,
   attempts,
   insight,
-  concepts,
   onChangeStream,
   onGoToDashboard,
 }: {
@@ -46,7 +44,6 @@ export function MockHub({
   summary: DashboardSummary | null;
   attempts: AttemptListItem[];
   insight: DashboardInsight | null;
-  concepts: ConceptMastery[];
   onChangeStream: () => void;
   onGoToDashboard: () => void;
 }) {
@@ -57,29 +54,15 @@ export function MockHub({
   );
   const lastAttempt = attempts.length > 0 ? attempts[attempts.length - 1] : null;
 
-  // Per-subject mastery, averaged from concept-level mastery (0–1 → %).
-  const subjects = useMemo(() => {
-    const map = new Map<string, { sum: number; n: number }>();
-    concepts.forEach((c) => {
-      const cur = map.get(c.subject_name) ?? { sum: 0, n: 0 };
-      cur.sum += c.p_mastery;
-      cur.n += 1;
-      map.set(c.subject_name, cur);
-    });
-    return [...map.entries()]
-      .map(([name, { sum, n }]) => ({ name, pct: (sum / n) * 100 }))
-      .sort((a, b) => b.pct - a.pct);
-  }, [concepts]);
-
   return (
-    <div className="animate-step-in flex flex-col gap-8">
+    <div className="animate-step-in flex flex-col gap-5">
       {/* ---- Hero ---- */}
-      <header className="flex flex-wrap items-start justify-between gap-4">
+      <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="text-[28px] font-bold leading-tight tracking-[-0.02em] text-ink md:text-[36px]">
+          <h1 className="text-[24px] font-bold leading-tight tracking-[-0.02em] text-ink md:text-[30px]">
             {examName} Preparation Hub
           </h1>
-          <p className="mt-2 max-w-[52ch] text-[16px] leading-relaxed text-ink-secondary">
+          <p className="mt-1 max-w-[52ch] text-[15px] leading-relaxed text-ink-secondary">
             Track progress, improve performance, and achieve your target rank.
           </p>
         </div>
@@ -95,7 +78,7 @@ export function MockHub({
 
       {/* ---- KPIs (real analytics) or a motivational start ---- */}
       {hasData && summary ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <KpiCard icon={ClipboardCheck} label="Mocks completed" value={compactNumber(summary.total_attempts)} />
           <KpiCard icon={Target} label="Avg accuracy" value={formatPct(summary.avg_accuracy_pct)} />
           <KpiCard icon={TrendingUp} label="Latest percentile" value={summary.latest_percentile.toFixed(1)} />
@@ -129,99 +112,35 @@ export function MockHub({
         </div>
       )}
 
-      {/* ---- AI insight + subject performance (real, only with data) ---- */}
-      {hasData ? (
-        <div className="grid gap-6 lg:grid-cols-5">
-          {insight ? (
-            <section className="relative overflow-hidden rounded-[20px] border border-hairline bg-surface-card p-6 shadow-[var(--shadow-card)] lg:col-span-3">
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-brand-fill/10 blur-[70px]"
-              />
-              <div className="relative">
-                <span className="inline-flex items-center gap-2 rounded-full border border-hairline bg-surface/70 px-3 py-1 text-[12px] font-medium tracking-[0.04em] text-ink-secondary">
-                  <Sparkles className="h-3.5 w-3.5 text-brand" strokeWidth={2} />
-                  AI INSIGHT
-                </span>
-                <p className="mt-4 text-[16px] leading-relaxed text-ink">{insight.summary}</p>
+      {/* AI insight & subject performance intentionally live on the Dashboard tab
+          only, to keep the Mock Test hub focused on progress + the catalogue. */}
 
-                <div className="mt-5 flex flex-col gap-2.5">
-                  {insight.persistent_strengths[0] ? (
-                    <InsightLine tone="good" label="Strength" text={insight.persistent_strengths[0]} />
-                  ) : null}
-                  {(concepts[0]?.kc_name ?? insight.persistent_gaps[0]) ? (
-                    <InsightLine
-                      tone="bad"
-                      label="Focus area"
-                      text={concepts[0]?.kc_name ?? insight.persistent_gaps[0]}
-                    />
-                  ) : null}
-                  {insight.study_plan[0] ? (
-                    <InsightLine tone="next" label="Next step" text={insight.study_plan[0].action} />
-                  ) : null}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={onGoToDashboard}
-                  className="mt-5 inline-flex items-center gap-1.5 text-[14px] font-medium text-brand transition-opacity hover:opacity-70"
-                >
-                  View full analysis
-                  <ArrowRight className="h-4 w-4" strokeWidth={2.25} />
-                </button>
-              </div>
-            </section>
-          ) : null}
-
-          {/* Subject performance */}
-          {subjects.length > 0 ? (
-            <section className="rounded-[20px] border border-hairline bg-surface-card p-6 shadow-[var(--shadow-card)] lg:col-span-2">
-              <h2 className="text-[15px] font-semibold tracking-[-0.01em] text-ink">
-                Subject performance
-              </h2>
-              <p className="mt-0.5 text-[12px] text-ink-secondary">Concept mastery by subject</p>
-              <div className="mt-5 flex flex-col gap-4">
-                {subjects.map((s) => (
-                  <SubjectBar key={s.name} name={s.name} pct={s.pct} />
-                ))}
-              </div>
-            </section>
-          ) : null}
-        </div>
-      ) : null}
-
-      {/* ---- Continue where you left off (real: last attempt) ---- */}
+      {/* ---- Continue where you left off (real: last attempt) — compact one-liner ---- */}
       {lastAttempt ? (
-        <section className="rounded-[20px] border border-hairline bg-surface-card p-6 shadow-[var(--shadow-card)]">
-          <div className="flex flex-wrap items-center justify-between gap-4">
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-hairline bg-surface-card px-4 py-3 shadow-[var(--shadow-card)]">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-brand-fill/[0.1] text-brand sm:flex">
+              <ClipboardCheck className="h-[18px] w-[18px]" strokeWidth={2} />
+            </span>
             <div className="min-w-0">
-              <p className="text-[12px] font-medium uppercase tracking-[0.06em] text-ink-secondary">
-                Continue where you left off
-              </p>
-              <h2 className="mt-1.5 truncate text-[18px] font-semibold text-ink">
+              <p className="truncate text-[15px] font-semibold text-ink">
+                <span className="font-medium text-ink-secondary">Continue: </span>
                 {lastAttempt.mock_title}
-              </h2>
-              <p className="mt-1 text-[13px] text-ink-secondary">
-                Last attempt · {formatDate(lastAttempt.submitted_at)} · scored{" "}
-                {lastAttempt.score.toFixed(0)}/{lastAttempt.max_score.toFixed(0)}
+              </p>
+              <p className="truncate text-[12px] text-ink-secondary">
+                {formatDate(lastAttempt.submitted_at)} · scored {lastAttempt.score.toFixed(0)}/
+                {lastAttempt.max_score.toFixed(0)} · {formatPct(lastAttempt.accuracy_pct)} accuracy
               </p>
             </div>
-            <button
-              type="button"
-              onClick={onGoToDashboard}
-              className="inline-flex h-[44px] shrink-0 items-center gap-2 rounded-[12px] bg-brand-fill px-5 text-[15px] font-medium text-brand-on transition-colors hover:bg-brand-fill-hover"
-            >
-              Review analysis
-              <ArrowRight className="h-[18px] w-[18px]" strokeWidth={2.25} />
-            </button>
           </div>
-          <div className="mt-4">
-            <div className="mb-1.5 flex items-center justify-between text-[12px] text-ink-secondary">
-              <span>Accuracy</span>
-              <span className="font-medium text-ink">{formatPct(lastAttempt.accuracy_pct)}</span>
-            </div>
-            <Bar pct={lastAttempt.accuracy_pct} />
-          </div>
+          <button
+            type="button"
+            onClick={onGoToDashboard}
+            className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-[10px] bg-brand-fill px-3.5 text-[13px] font-medium text-brand-on transition-colors hover:bg-brand-fill-hover"
+          >
+            Review analysis
+            <ArrowRight className="h-4 w-4" strokeWidth={2.25} />
+          </button>
         </section>
       ) : null}
 
@@ -245,62 +164,19 @@ function KpiCard({
   sub?: string;
 }) {
   return (
-    <div className="rounded-[16px] border border-hairline bg-surface-card p-4 shadow-[var(--shadow-card)]">
-      <div className="flex items-center gap-2.5">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-brand-fill/[0.1] text-brand">
-          <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
+    <div className="rounded-[14px] border border-hairline bg-surface-card px-3.5 py-3 shadow-[var(--shadow-card)]">
+      <div className="flex items-center gap-2">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-brand-fill/[0.1] text-brand">
+          <Icon className="h-4 w-4" strokeWidth={2} />
         </span>
-        <p className="min-w-0 truncate text-[13px] text-ink-secondary">{label}</p>
+        <p className="truncate text-[22px] font-semibold leading-none tracking-[-0.02em] text-ink">
+          {value}
+        </p>
       </div>
-      <p className="mt-3 text-[26px] font-semibold leading-none tracking-[-0.02em] text-ink">
-        {value}
+      <p className="mt-2 truncate text-[12px] text-ink-secondary">
+        {label}
+        {sub ? ` · ${sub}` : ""}
       </p>
-      {sub ? <p className="mt-1.5 text-[12px] text-ink-secondary">{sub}</p> : null}
-    </div>
-  );
-}
-
-function InsightLine({
-  tone,
-  label,
-  text,
-}: {
-  tone: "good" | "bad" | "next";
-  label: string;
-  text: string;
-}) {
-  const dot =
-    tone === "good" ? "bg-success" : tone === "bad" ? "bg-error" : "bg-brand-fill";
-  return (
-    <div className="flex items-start gap-2.5">
-      <span aria-hidden="true" className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${dot}`} />
-      <p className="text-[14px] leading-relaxed text-ink-secondary">
-        <span className="font-medium text-ink">{label}:</span> {text}
-      </p>
-    </div>
-  );
-}
-
-function SubjectBar({ name, pct }: { name: string; pct: number }) {
-  return (
-    <div>
-      <div className="mb-1.5 flex items-center justify-between text-[13px]">
-        <span className="font-medium text-ink">{name}</span>
-        <span className="text-ink-secondary">{Math.round(pct)}%</span>
-      </div>
-      <Bar pct={pct} />
-    </div>
-  );
-}
-
-function Bar({ pct }: { pct: number }) {
-  const clamped = Math.max(0, Math.min(100, pct));
-  return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-surface-field">
-      <div
-        className="h-full rounded-full bg-brand-fill transition-[width] duration-500 ease-out"
-        style={{ width: `${clamped}%` }}
-      />
     </div>
   );
 }
@@ -322,8 +198,8 @@ function MockCatalog({ groups }: { groups: MockTestGroups }) {
 
   return (
     <section>
-      <div className="mb-5 flex items-baseline justify-between gap-3">
-        <h2 className="text-[22px] font-semibold tracking-[-0.02em] text-ink">Mock tests</h2>
+      <div className="mb-4 flex items-baseline justify-between gap-3">
+        <h2 className="text-[20px] font-semibold tracking-[-0.02em] text-ink">Mock tests</h2>
       </div>
 
       {tabs.length === 0 ? (
