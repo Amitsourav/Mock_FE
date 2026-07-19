@@ -24,7 +24,7 @@ function Callout({ label, value }: { label: string; value: string }) {
  */
 export function StrategyPanel({ strategy }: { strategy: StrategyData }) {
   return (
-    <Panel title="Test strategy & behaviour">
+    <Panel>
       {/* Pacing takeaway — the sentence first, evidence beneath. */}
       <div className="mb-5 flex items-start gap-2.5 rounded-[12px] bg-surface-field px-4 py-3">
         <Gauge className="mt-0.5 size-4 shrink-0 text-brand" strokeWidth={2} aria-hidden="true" />

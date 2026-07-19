@@ -6,8 +6,7 @@ import { AuthLayout } from "@/components/ui/auth-layout";
 import { Button } from "@/components/Button";
 import { PhoneStep } from "@/components/steps/PhoneStep";
 import { OtpStep } from "@/components/steps/OtpStep";
-import { ProfileStep } from "@/components/steps/ProfileStep";
-import { DoneStep } from "@/components/steps/DoneStep";
+import { OnboardingWizard } from "@/components/onboarding/OnboardingWizard";
 import { AppShell } from "@/components/app/AppShell";
 import { ApiError, getMe } from "@/lib/api";
 import type { AuthTarget } from "@/lib/authTarget";
@@ -20,7 +19,6 @@ type Step =
   | { name: "otp"; target: AuthTarget }
   | { name: "loadingProfile" }
   | { name: "profile"; user: User }
-  | { name: "done"; user: User; variant: "registered" | "already" }
   | { name: "app"; user: User }
   | { name: "error"; message: string };
 
@@ -91,6 +89,19 @@ export default function Page() {
     );
   }
 
+  // The onboarding wizard is a full-viewport premium flow, not the centred auth
+  // card. It owns its own "Welcome → Enter Dashboard" screen, which lands here.
+  if (step.name === "profile") {
+    return (
+      <OnboardingWizard
+        user={step.user}
+        onEnterDashboard={(user) => setStep({ name: "app", user })}
+        onUnauthorized={() => void handleUnauthorized()}
+        onLogout={() => void handleLogout()}
+      />
+    );
+  }
+
   // The post-login app takes the whole viewport — not the centred auth card.
   if (step.name === "app") {
     return (
@@ -142,22 +153,6 @@ export default function Page() {
             target={step.target}
             onVerified={() => void loadProfile()}
             onChangeNumber={() => setStep({ name: "phone" })}
-          />
-        ) : null}
-
-        {step.name === "profile" ? (
-          <ProfileStep
-            user={step.user}
-            onCompleted={(user) => setStep({ name: "done", user, variant: "registered" })}
-            onUnauthorized={() => void handleUnauthorized()}
-          />
-        ) : null}
-
-        {step.name === "done" ? (
-          <DoneStep
-            user={step.user}
-            variant={step.variant}
-            onLogout={() => void handleLogout()}
           />
         ) : null}
       </Card>

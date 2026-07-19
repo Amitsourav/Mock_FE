@@ -6,7 +6,6 @@ import { ComingSoonModal } from "@/components/app/ComingSoonModal";
 import { MobileNav, Sidebar } from "@/components/app/Sidebar";
 import type { AppView } from "@/components/app/Sidebar";
 import { ProfileMenu } from "@/components/app/ProfileMenu";
-import { StreamPicker } from "@/components/app/StreamPicker";
 import { DashboardView } from "@/components/app/dashboard/DashboardView";
 import { MockTestView } from "@/components/app/mocks/MockTestView";
 import { ApiError, getStream } from "@/lib/api";
@@ -33,7 +32,9 @@ export function AppShell({
 }) {
   const [view, setView] = useState<AppView>("dashboard");
   const [comingSoonOpen, setComingSoonOpen] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  // Drives the inline exam-stream discovery takeover when switching an existing
+  // stream (a fresh, stream-less user gets it automatically via MockTestView).
+  const [reselecting, setReselecting] = useState(false);
 
   const [stream, setStream] = useState<StreamOut | null>(null);
   const [streamLoading, setStreamLoading] = useState(true);
@@ -60,7 +61,21 @@ export function AppShell({
   }, [onUnauthorized]);
 
   const openComingSoon = useCallback(() => setComingSoonOpen(true), []);
-  const openStreamPicker = useCallback(() => setPickerOpen(true), []);
+  // "Switch exam stream" / "Change" now open the inline discovery on the Mock
+  // Test view rather than a modal.
+  const openStreamPicker = useCallback(() => {
+    setReselecting(true);
+    setView("mocks");
+  }, []);
+
+  // A stream was chosen/switched from the discovery page: adopt it, re-fetch the
+  // mock catalogue, and make sure the change is visible.
+  const handleStreamSwitched = useCallback((next: StreamOut) => {
+    setStream(next);
+    setStreamVersion((v) => v + 1);
+    setReselecting(false);
+    setView("mocks");
+  }, []);
 
   return (
     <AppActionsProvider value={{ openComingSoon, openStreamPicker }}>
@@ -88,8 +103,14 @@ export function AppShell({
                 <DashboardView onUnauthorized={onUnauthorized} />
               ) : (
                 <MockTestView
+                  user={user}
+                  currentStream={stream}
+                  reselecting={reselecting}
                   streamVersion={streamVersion}
                   onOpenPicker={openStreamPicker}
+                  onCancelReselect={() => setReselecting(false)}
+                  onStreamSwitched={handleStreamSwitched}
+                  onGoToDashboard={() => setView("dashboard")}
                   onUnauthorized={onUnauthorized}
                 />
               )}
@@ -101,19 +122,6 @@ export function AppShell({
       </div>
 
       <ComingSoonModal open={comingSoonOpen} onClose={() => setComingSoonOpen(false)} />
-
-      <StreamPicker
-        open={pickerOpen}
-        current={stream}
-        onClose={() => setPickerOpen(false)}
-        onSwitched={(next) => {
-          setStream(next);
-          setStreamVersion((v) => v + 1); // triggers Mock Test re-fetch
-          setPickerOpen(false);
-          setView("mocks"); // show the switch took effect
-        }}
-        onUnauthorized={onUnauthorized}
-      />
     </AppActionsProvider>
   );
 }

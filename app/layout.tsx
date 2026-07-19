@@ -1,5 +1,18 @@
 import type { Metadata, Viewport } from "next";
+import { Fraunces } from "next/font/google";
 import "./globals.css";
+
+/**
+ * The display face — an editorial variable serif with real character, used only
+ * for the dashboard hero number and section titles (via --font-display). Body /
+ * UI stays on the system stack, so the rest of the app is untouched.
+ */
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-fraunces",
+  display: "swap",
+  axes: ["opsz"],
+});
 
 export const metadata: Metadata = {
   title: "Register — dMAT Mock",
@@ -19,7 +32,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={fraunces.variable}>
       <body className="antialiased">{children}</body>
     </html>
   );

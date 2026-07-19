@@ -34,6 +34,14 @@
   --et-guess: #8944ab;
   --et-unattempted: #8e8e93;
 
+  /* Mastery ramp (weak → strong). Paul Tol's "vibrant" set — colourblind-safe
+     across the common CVD types (red↔teal stay distinct; amber sits between by
+     lightness). Always shown with a % and label, never colour alone. One ramp,
+     used everywhere mastery appears: bars, chips, radar accents. */
+  --mastery-weak: #cc3311;
+  --mastery-developing: #ee7733;
+  --mastery-strong: #009988;
+
   /* --- shadcn compatibility -------------------------------------------------
      Anything added later via `npx shadcn add …` expects these names. Aliasing
      them onto the tokens above means generated components inherit our palette
@@ -90,6 +98,11 @@
     --et-guess: #bf5af2;
     --et-unattempted: #98989d;
 
+    /* Mastery ramp lifted for luminance on the dark card surface. */
+    --mastery-weak: #ff6b57;
+    --mastery-developing: #ff9e4d;
+    --mastery-strong: #2cc4ad;
+
     /* The shadcn aliases above are declared with var(), so they follow these
        automatically — only the two that resolve to literals need restating. */
     --destructive-foreground: #ffffff;
@@ -111,6 +124,13 @@
   --color-success: var(--success);
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui,
     "Segoe UI", Roboto, sans-serif;
+  /* Editorial display face (dashboard hero + section titles). Falls back to a
+     system serif so the layout never waits on the web font. */
+  --font-display: var(--font-fraunces), ui-serif, Georgia, "Times New Roman", serif;
+
+  --color-mastery-weak: var(--mastery-weak);
+  --color-mastery-developing: var(--mastery-developing);
+  --color-mastery-strong: var(--mastery-strong);
 
   /* shadcn-facing aliases, so `bg-background` / `text-muted-foreground` etc.
      work in any component the CLI generates. */
@@ -199,6 +219,46 @@ body {
 
 .animate-step-in {
   animation: step-in 240ms ease-out;
+}
+
+/* --- Dashboard load orchestration ----------------------------------------
+   A single cinematic page-load: sections rise and fade in sequence (stagger via
+   inline animation-delay), the hero gauge draws its arc, and the hero number
+   counts up (JS, in the component). `backwards` holds delayed items hidden until
+   their turn. All of it collapses under prefers-reduced-motion via the global
+   reset below, and the count-up hook checks the same preference.
+-------------------------------------------------------------------------- */
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes arc-draw {
+  from {
+    stroke-dashoffset: var(--arc-len);
+  }
+  to {
+    stroke-dashoffset: var(--arc-to);
+  }
+}
+
+.reveal {
+  animation: reveal 640ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.animate-arc {
+  animation: arc-draw 1100ms cubic-bezier(0.22, 1, 0.36, 1) 120ms backwards;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
 }
 
 .animate-shake {

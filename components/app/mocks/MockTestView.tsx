@@ -1,108 +1,82 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ChevronDown, Pencil } from "lucide-react";
-import { MockCard } from "@/components/app/mocks/MockCard";
 import { Skeleton } from "@/components/app/Skeleton";
-import { ApiError, getMockTests } from "@/lib/api";
-import type { MockTest, MockTestGroups, SubjectGroup } from "@/lib/types";
-import { cn } from "@/lib/utils";
-
-function MockGrid({ mocks }: { mocks: MockTest[] }) {
-  return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      {mocks.map((mock) => (
-        <MockCard key={mock.id} mock={mock} />
-      ))}
-    </div>
-  );
-}
-
-function GroupHeading({ children, count }: { children: React.ReactNode; count: number }) {
-  return (
-    <div className="mb-3 flex items-baseline gap-2">
-      <h3 className="text-[17px] font-semibold tracking-[-0.01em] text-ink">{children}</h3>
-      <span className="text-[13px] text-ink-secondary">{count}</span>
-    </div>
-  );
-}
-
-/** A collapsible subject with its subject-level and chapter-level mocks. */
-function SubjectSection({ subject, defaultOpen }: { subject: SubjectGroup; defaultOpen: boolean }) {
-  const [open, setOpen] = useState(defaultOpen);
-  const total = subject.subject_mocks.length + subject.chapter_mocks.length;
-
-  return (
-    <div className="rounded-[14px] border border-hairline bg-surface-card">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
-      >
-        <span className="flex items-baseline gap-2">
-          <span className="text-[15px] font-semibold text-ink">{subject.subject_name}</span>
-          <span className="text-[13px] text-ink-secondary">{total} mocks</span>
-        </span>
-        <ChevronDown
-          className={cn(
-            "size-5 shrink-0 text-ink-secondary transition-transform duration-200",
-            open && "rotate-180"
-          )}
-          strokeWidth={2}
-          aria-hidden="true"
-        />
-      </button>
-
-      {open ? (
-        <div className="flex flex-col gap-5 border-t border-hairline p-5">
-          {subject.subject_mocks.length > 0 ? (
-            <div>
-              <p className="mb-3 text-[13px] font-medium text-ink-secondary">Subject mocks</p>
-              <MockGrid mocks={subject.subject_mocks} />
-            </div>
-          ) : null}
-          {subject.chapter_mocks.length > 0 ? (
-            <div>
-              <p className="mb-3 text-[13px] font-medium text-ink-secondary">Chapter mocks</p>
-              <MockGrid mocks={subject.chapter_mocks} />
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-    </div>
-  );
-}
+import { StreamDiscovery } from "@/components/app/StreamDiscovery";
+import { MockHub } from "@/components/app/mocks/MockHub";
+import {
+  ApiError,
+  getAttempts,
+  getConcepts,
+  getDashboardSummary,
+  getInsight,
+  getMockTests,
+} from "@/lib/api";
+import type {
+  AttemptListItem,
+  ConceptMastery,
+  DashboardInsight,
+  DashboardSummary,
+  MockTestGroups,
+  StreamOut,
+  User,
+} from "@/lib/types";
 
 function LoadingState() {
   return (
-    <div role="status" aria-busy="true" aria-label="Loading mocks" className="flex flex-col gap-6">
-      <Skeleton className="h-8 w-56" />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+    <div role="status" aria-busy="true" aria-label="Loading your hub" className="flex flex-col gap-8">
+      <Skeleton className="h-10 w-72" />
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         {Array.from({ length: 6 }, (_, i) => (
+          <Skeleton key={i} className="h-[104px]" />
+        ))}
+      </div>
+      <div className="grid gap-6 lg:grid-cols-5">
+        <Skeleton className="h-[240px] lg:col-span-3" />
+        <Skeleton className="h-[240px] lg:col-span-2" />
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 3 }, (_, i) => (
           <Skeleton key={i} className="h-[168px]" />
         ))}
       </div>
-      <span className="sr-only">Loading mocks…</span>
+      <span className="sr-only">Loading your hub…</span>
     </div>
   );
 }
 
 /**
- * The Mock Test section. Header shows the current stream with a "change"
- * affordance (opens the same picker as Profile → Switch Exam Stream). Re-fetches
- * whenever `streamVersion` changes (i.e. after a switch).
+ * The Mock Test section. When a stream is set it renders the MockHub command
+ * centre (catalogue + real analytics); with no stream, or when switching, it
+ * hands off to the inline StreamDiscovery experience. Re-fetches whenever
+ * `streamVersion` changes.
  */
 export function MockTestView({
+  user,
+  currentStream,
+  reselecting,
   streamVersion,
   onOpenPicker,
+  onCancelReselect,
+  onStreamSwitched,
+  onGoToDashboard,
   onUnauthorized,
 }: {
+  user: User;
+  currentStream: StreamOut | null;
+  reselecting: boolean;
   streamVersion: number;
   onOpenPicker: () => void;
+  onCancelReselect: () => void;
+  onStreamSwitched: (next: StreamOut) => void;
+  onGoToDashboard: () => void;
   onUnauthorized: () => void;
 }) {
   const [groups, setGroups] = useState<MockTestGroups | null>(null);
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [attempts, setAttempts] = useState<AttemptListItem[]>([]);
+  const [insight, setInsight] = useState<DashboardInsight | null>(null);
+  const [concepts, setConcepts] = useState<ConceptMastery[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [noStream, setNoStream] = useState(false);
@@ -112,7 +86,19 @@ export function MockTestView({
     setError(null);
     setNoStream(false);
     try {
-      setGroups(await getMockTests());
+      const g = await getMockTests();
+      setGroups(g);
+      // Analytics are best-effort: a failure here still leaves a usable catalogue.
+      const [s, a, ins, con] = await Promise.allSettled([
+        getDashboardSummary(),
+        getAttempts(),
+        getInsight(),
+        getConcepts(),
+      ]);
+      setSummary(s.status === "fulfilled" ? s.value : null);
+      setAttempts(a.status === "fulfilled" ? a.value : []);
+      setInsight(ins.status === "fulfilled" ? ins.value : null);
+      setConcepts(con.status === "fulfilled" ? con.value : []);
     } catch (err) {
       if (err instanceof ApiError && err.unauthorized) {
         onUnauthorized();
@@ -122,7 +108,7 @@ export function MockTestView({
       if (err instanceof ApiError && err.status === 409 && err.code === "no_stream") {
         setNoStream(true);
       } else {
-        setError(err instanceof ApiError ? err.message : "Couldn't load mocks. Please try again.");
+        setError(err instanceof ApiError ? err.message : "Couldn't load your hub. Please try again.");
       }
     } finally {
       setLoading(false);
@@ -133,23 +119,26 @@ export function MockTestView({
     void load();
   }, [load, streamVersion]);
 
+  // Switching an existing stream: take over inline (seeded + cancellable),
+  // without waiting on the catalogue we're about to replace anyway.
+  if (reselecting) {
+    return (
+      <StreamDiscovery
+        user={user}
+        current={currentStream}
+        onSwitched={onStreamSwitched}
+        onCancel={onCancelReselect}
+        onUnauthorized={onUnauthorized}
+      />
+    );
+  }
+
   if (loading) return <LoadingState />;
 
+  // No stream yet → the rich discovery experience instead of a lone button.
   if (noStream) {
     return (
-      <div className="rounded-[16px] border border-hairline bg-surface-card p-10 text-center">
-        <h2 className="text-[18px] font-semibold text-ink">Pick an exam stream first</h2>
-        <p className="mx-auto mt-2 max-w-[42ch] text-[14px] text-ink-secondary">
-          Choose what you&apos;re preparing for and we&apos;ll show the mocks for it.
-        </p>
-        <button
-          type="button"
-          onClick={onOpenPicker}
-          className="mt-5 inline-flex h-[44px] items-center rounded-[12px] bg-brand-fill px-5 text-[15px] font-medium text-brand-on transition-colors hover:bg-brand-fill-hover"
-        >
-          Choose exam stream
-        </button>
-      </div>
+      <StreamDiscovery user={user} onSwitched={onStreamSwitched} onUnauthorized={onUnauthorized} />
     );
   }
 
@@ -172,70 +161,16 @@ export function MockTestView({
 
   if (!groups) return null;
 
-  const hasSubjects = groups.subjects.some(
-    (s) => s.subject_mocks.length + s.chapter_mocks.length > 0
-  );
-  const isEmpty =
-    groups.full_mocks.length === 0 && groups.sectional_mocks.length === 0 && !hasSubjects;
-
   return (
-    <div className="flex flex-col gap-8">
-      {/* Stream header with a change affordance. */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-[13px] text-ink-secondary">Showing mocks for</p>
-          <p className="text-[22px] font-semibold tracking-[-0.02em] text-ink">
-            {groups.catalog_exam_name}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onOpenPicker}
-          className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-surface-card px-3.5 py-2 text-[13px] font-medium text-brand transition-colors hover:bg-surface-field"
-        >
-          <Pencil className="size-3.5" strokeWidth={2} aria-hidden="true" />
-          Change
-        </button>
-      </div>
-
-      {isEmpty ? (
-        <div className="rounded-[16px] border border-hairline bg-surface-card p-10 text-center">
-          <p className="text-[15px] text-ink-secondary">
-            No mocks are available for this stream yet.
-          </p>
-        </div>
-      ) : null}
-
-      {groups.full_mocks.length > 0 ? (
-        <section>
-          <GroupHeading count={groups.full_mocks.length}>Full mocks</GroupHeading>
-          <MockGrid mocks={groups.full_mocks} />
-        </section>
-      ) : null}
-
-      {groups.sectional_mocks.length > 0 ? (
-        <section>
-          <GroupHeading count={groups.sectional_mocks.length}>Sectional mocks</GroupHeading>
-          <MockGrid mocks={groups.sectional_mocks} />
-        </section>
-      ) : null}
-
-      {hasSubjects ? (
-        <section>
-          <h3 className="mb-3 text-[17px] font-semibold tracking-[-0.01em] text-ink">By subject</h3>
-          <div className="flex flex-col gap-3">
-            {groups.subjects
-              .filter((s) => s.subject_mocks.length + s.chapter_mocks.length > 0)
-              .map((subject, index) => (
-                <SubjectSection
-                  key={subject.subject_code}
-                  subject={subject}
-                  defaultOpen={index === 0}
-                />
-              ))}
-          </div>
-        </section>
-      ) : null}
-    </div>
+    <MockHub
+      examName={groups.catalog_exam_name}
+      groups={groups}
+      summary={summary}
+      attempts={attempts}
+      insight={insight}
+      concepts={concepts}
+      onChangeStream={onOpenPicker}
+      onGoToDashboard={onGoToDashboard}
+    />
   );
 }

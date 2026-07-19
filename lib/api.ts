@@ -6,6 +6,7 @@ import type {
   ConceptMastery,
   DashboardInsight,
   DashboardSummary,
+  ExamSummary,
   MockTest,
   MockTestGroups,
   ProfilePayload,
@@ -139,6 +140,15 @@ export function getCategoryExams(categoryCode: string) {
 
 export function getCountries() {
   return request<RefItem[]>("/reference/countries");
+}
+
+/**
+ * The public exam catalog. Onboarding joins this by `code` onto the cascade's
+ * exams to show a description and duration on each exam card — the cascade
+ * endpoint returns neither.
+ */
+export function getExamCatalog() {
+  return request<ExamSummary[]>("/exams");
 }
 
 // --- Exam stream -----------------------------------------------------------

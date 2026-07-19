@@ -34,6 +34,21 @@ export type CatalogExam = RefItem & {
   default_country_code: string | null;
 };
 
+/**
+ * The public exam catalog (GET /exams). Carries the marketing-facing copy the
+ * cascade's CatalogExam omits — `description` and `total_duration_seconds` — so
+ * the onboarding exam cards can join it by `code` for a subtitle and duration.
+ */
+export type ExamSummary = {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  language: string;
+  total_duration_seconds: number | null;
+  scoring_type: string;
+};
+
 // --- Exam stream -----------------------------------------------------------
 
 export type StreamOut = {
