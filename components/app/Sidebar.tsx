@@ -4,9 +4,10 @@ import { BarChart3, ClipboardList } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type AppView = "dashboard" | "mocks";
+// "exam" is a full-screen takeover, not a nav destination, so it's absent from NAV.
+export type AppView = "dashboard" | "mocks" | "exam";
 
-const NAV: { view: AppView; label: string; Icon: LucideIcon }[] = [
+const NAV: { view: Exclude<AppView, "exam">; label: string; Icon: LucideIcon }[] = [
   { view: "dashboard", label: "Dashboard", Icon: BarChart3 },
   { view: "mocks", label: "Mock Test", Icon: ClipboardList },
 ];

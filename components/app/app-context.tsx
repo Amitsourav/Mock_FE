@@ -8,10 +8,12 @@ import { createContext, useContext } from "react";
  * the same single handler and cannot accidentally navigate into a test.
  */
 export type AppActions = {
-  /** Open the "mock tests are on the way" modal. The ONLY response to Start/Take/Attempt/Resume. */
+  /** Open the "mock tests are on the way" modal — the response for non-playable mocks. */
   openComingSoon: () => void;
   /** Open the Switch Exam Stream picker. */
   openStreamPicker: () => void;
+  /** Launch the full-screen test player for a playable mock's examination. */
+  openExam: (examinationId: string) => void;
 };
 
 const AppActionsContext = createContext<AppActions | null>(null);

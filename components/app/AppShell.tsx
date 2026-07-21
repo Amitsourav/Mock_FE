@@ -8,12 +8,14 @@ import type { AppView } from "@/components/app/Sidebar";
 import { ProfileMenu } from "@/components/app/ProfileMenu";
 import { DashboardView } from "@/components/app/dashboard/DashboardView";
 import { MockTestView } from "@/components/app/mocks/MockTestView";
+import { ExamPlayer } from "@/components/app/exam/ExamPlayer";
 import { ApiError, getStream } from "@/lib/api";
 import type { StreamOut, User } from "@/lib/types";
 
 const VIEW_TITLE: Record<AppView, string> = {
   dashboard: "Dashboard",
   mocks: "Mock Test",
+  exam: "Exam", // never shown — the exam view is a full-screen takeover
 };
 
 /**
@@ -31,6 +33,7 @@ export function AppShell({
   onUnauthorized: () => void;
 }) {
   const [view, setView] = useState<AppView>("dashboard");
+  const [examId, setExamId] = useState<string | null>(null);
   const [comingSoonOpen, setComingSoonOpen] = useState(false);
   // Drives the inline exam-stream discovery takeover when switching an existing
   // stream (a fresh, stream-less user gets it automatically via MockTestView).
@@ -61,6 +64,14 @@ export function AppShell({
   }, [onUnauthorized]);
 
   const openComingSoon = useCallback(() => setComingSoonOpen(true), []);
+  const openExam = useCallback((examinationId: string) => {
+    setExamId(examinationId);
+    setView("exam");
+  }, []);
+  const exitExam = useCallback(() => {
+    setExamId(null);
+    setView("mocks");
+  }, []);
   // "Switch exam stream" / "Change" now open the inline discovery on the Mock
   // Test view rather than a modal.
   const openStreamPicker = useCallback(() => {
@@ -77,8 +88,13 @@ export function AppShell({
     setView("mocks");
   }, []);
 
+  // The test player takes the whole viewport — no sidebar, header or nav.
+  if (view === "exam" && examId) {
+    return <ExamPlayer examinationId={examId} onExit={exitExam} onUnauthorized={onUnauthorized} />;
+  }
+
   return (
-    <AppActionsProvider value={{ openComingSoon, openStreamPicker }}>
+    <AppActionsProvider value={{ openComingSoon, openStreamPicker, openExam }}>
       <div className="flex min-h-dvh bg-surface">
         <Sidebar view={view} onNavigate={setView} />
 

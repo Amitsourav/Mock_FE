@@ -84,8 +84,10 @@ export type MockTest = {
   duration_seconds: number;
   total_questions: number;
   difficulty: string | null;
-  /** Kept in the model for later; every CTA is gated to the coming-soon modal for now. */
+  /** True for the launchable dMAT full mock; other mocks still gate to coming-soon. */
   is_playable: boolean;
+  /** Non-null only when is_playable — the exam to start an attempt against. */
+  examination_id: string | null;
 };
 
 export type SubjectGroup = {
@@ -248,4 +250,57 @@ export type StrategyData = {
   avg_calibration_gap: number;
   dominant_archetype: string;
   pacing_note: string;
+};
+
+// --- Test player (attempt + paper) -----------------------------------------
+
+export type AttemptState = {
+  id: string;
+  examination_id: string;
+  status: string;
+  expires_at: string | null;
+};
+
+export type PaperOption = {
+  id: string;
+  label: string | null;
+  content_md: string;
+  position: number;
+};
+
+export type PaperQuestion = {
+  id: string;
+  section_code: string;
+  section_name: string;
+  position: number; // 1..total, already in exam order
+  question_type: string;
+  content_md: string;
+  stimulus_md: string | null; // shared passage (General Academic items)
+  options: PaperOption[];
+  selected_option_id: string | null; // saved pick, for resume
+  is_marked_for_review: boolean;
+};
+
+export type PaperSection = { code: string; name: string; count: number };
+
+/** Integrity signals logged during an attempt (server keeps the durable record). */
+export type IntegrityEventType =
+  | "focus_lost"
+  | "focus_regained"
+  | "fullscreen_exit"
+  | "fullscreen_enter";
+
+export type IntegrityEvent = { event_type: IntegrityEventType; client_occurred_at: string };
+
+/** The full frozen paper. NO correct-answer fields are ever present. */
+export type Paper = {
+  attempt_id: string;
+  exam_code: string;
+  status: string;
+  expires_at: string | null;
+  server_time: string;
+  remaining_seconds: number;
+  total_questions: number;
+  sections: PaperSection[];
+  questions: PaperQuestion[];
 };

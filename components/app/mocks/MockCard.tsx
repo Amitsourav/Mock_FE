@@ -13,12 +13,13 @@ function difficultyLabel(value: string | null): string | null {
 }
 
 /**
- * One mock. Its primary CTA is hard-wired to the coming-soon gate — there is no
- * prop to make it launch a test, by design, because no test player exists yet.
+ * One mock. A playable mock (the dMAT full mock, with an examination_id) launches
+ * the test player; every other mock still routes to the coming-soon gate.
  */
 export function MockCard({ mock }: { mock: MockTest }) {
-  const { openComingSoon } = useAppActions();
+  const { openComingSoon, openExam } = useAppActions();
   const difficulty = difficultyLabel(mock.difficulty);
+  const playable = mock.is_playable && Boolean(mock.examination_id);
 
   return (
     <article className="flex flex-col rounded-[14px] border border-hairline bg-surface p-4">
@@ -50,7 +51,15 @@ export function MockCard({ mock }: { mock: MockTest }) {
       </dl>
 
       <div className="mt-4">
-        <Button type="button" onClick={openComingSoon} className="h-[44px] text-[15px]">
+        <Button
+          type="button"
+          onClick={() =>
+            playable && mock.examination_id
+              ? openExam(mock.examination_id)
+              : openComingSoon()
+          }
+          className="h-[44px] text-[15px]"
+        >
           Start test
         </Button>
       </div>

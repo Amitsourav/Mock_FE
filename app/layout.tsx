@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces } from "next/font/google";
 import "./globals.css";
+// KaTeX styles for the exam player's LaTeX rendering — imported once, app-wide.
+import "katex/dist/katex.min.css";
 
 /**
  * The display face — an editorial variable serif with real character, used only

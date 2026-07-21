@@ -2,13 +2,16 @@ import { getAccessToken } from "./supabase";
 import type {
   AttemptDetail,
   AttemptListItem,
+  AttemptState,
   CatalogExam,
   ConceptMastery,
   DashboardInsight,
   DashboardSummary,
   ExamSummary,
+  IntegrityEvent,
   MockTest,
   MockTestGroups,
+  Paper,
   ProfilePayload,
   RefItem,
   SkillStat,
@@ -211,4 +214,52 @@ export function getConcepts() {
 
 export function getStrategy() {
   return request<StrategyData>("/dashboard/strategy");
+}
+
+// --- Test player (attempt + paper) -----------------------------------------
+
+/** Freeze a random 76-question paper. 409 {code:"attempt_already_active"} → resume instead. */
+export function startAttempt(examinationId: string) {
+  return request<AttemptState>(`/exams/${encodeURIComponent(examinationId)}/attempts`, {
+    method: "POST",
+  });
+}
+
+/** The user's in-progress attempt for this exam. Throws ApiError 404 {code:"no_active_attempt"}. */
+export function getCurrentAttempt(examinationId: string) {
+  return request<AttemptState>(
+    `/exams/${encodeURIComponent(examinationId)}/attempts/current`
+  );
+}
+
+/** The whole frozen paper — call after start/resume and on reload. Carries saved picks + remaining time. */
+export function getPaper(attemptId: string) {
+  return request<Paper>(`/attempts/${encodeURIComponent(attemptId)}/paper`);
+}
+
+/** Autosave one answer. 409 {code:"attempt_expired"} once the overall time is up. */
+export function saveAnswer(
+  attemptId: string,
+  body: { question_id: string; selected_option_id: string; is_marked_for_review?: boolean }
+) {
+  return request<{ saved: boolean; attempt_id: string; question_id: string; answered_at: string }>(
+    `/attempts/${encodeURIComponent(attemptId)}/answers`,
+    { method: "POST", body: JSON.stringify(body) }
+  );
+}
+
+/** Finalise the attempt. No scoring — returns a status message to show the user. */
+export function submitAttempt(attemptId: string) {
+  return request<{ status: string; message: string }>(
+    `/attempts/${encodeURIComponent(attemptId)}/submit`,
+    { method: "POST" }
+  );
+}
+
+/** Log integrity events (focus/fullscreen). Batched; logged for review, not scored. */
+export function postAttemptEvents(attemptId: string, events: IntegrityEvent[]) {
+  return request<{ ok?: boolean }>(`/attempts/${encodeURIComponent(attemptId)}/events`, {
+    method: "POST",
+    body: JSON.stringify({ events }),
+  });
 }
