@@ -27,7 +27,7 @@ export function ErrorDonut({ distribution }: { distribution: ErrorDistribution }
     <div className="flex flex-col items-center gap-5 sm:flex-row sm:gap-7">
       <svg
         viewBox={`0 0 ${SIZE} ${SIZE}`}
-        className="h-[180px] w-[180px] shrink-0 -rotate-90"
+        className="h-[150px] w-[150px] shrink-0 -rotate-90"
         role="img"
         aria-label={`Error breakdown: ${slices.map((s) => `${s.label} ${s.value}`).join(", ")}.`}
       >
@@ -83,8 +83,13 @@ export function ErrorDonut({ distribution }: { distribution: ErrorDistribution }
               >
                 <s.Icon className="size-3" strokeWidth={3} />
               </span>
-              <span className="flex-1 text-ink">{s.label}</span>
-              <span className="text-ink-secondary" style={{ fontVariantNumeric: "tabular-nums" }}>
+              <span className="min-w-0 flex-1 truncate text-ink">{s.label}</span>
+              {/* nowrap + shrink-0: in a narrow tile the value must never break
+                  at the "·" — the label truncates instead. */}
+              <span
+                className="shrink-0 whitespace-nowrap text-ink-secondary"
+                style={{ fontVariantNumeric: "tabular-nums" }}
+              >
                 {s.value} · {pct.toFixed(0)}%
               </span>
             </li>

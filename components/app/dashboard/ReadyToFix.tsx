@@ -1,10 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowRight, RotateCcw, Sparkles } from "lucide-react";
+import { RotateCcw, Sparkles } from "lucide-react";
 import type { ConceptMastery } from "@/lib/types";
-
-const PREVIEW = 4;
 
 /** Mastery band → colour + label from the shared mastery ramp. Never colour-only. */
 function masteryBand(p: number): { color: string; label: string } {
@@ -120,7 +117,8 @@ function FocusCard({ c }: { c: ConceptMastery }) {
   );
 }
 
-/** A labelled sub-panel for one group, with a colour-dot header + count and expander. */
+/** A labelled sub-panel for one group: colour-dot header + count, and its OWN
+ *  internal scroll — every concept is reachable in place, no expander. */
 function GroupPanel({
   title,
   hint,
@@ -136,9 +134,6 @@ function GroupPanel({
   concepts: ConceptMastery[];
   revise?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const shown = expanded ? concepts : concepts.slice(0, PREVIEW);
-
   return (
     <div className="rounded-[16px] border border-hairline bg-surface-card p-4">
       <div className="mb-3 flex items-baseline justify-between gap-2">
@@ -156,23 +151,12 @@ function GroupPanel({
       {concepts.length === 0 ? (
         <p className="py-2 text-[13px] text-ink-secondary">Nothing here — nicely done.</p>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {shown.map((c) => (
+        <ul className="flex max-h-[312px] flex-col gap-2 overflow-y-auto overscroll-contain pr-1">
+          {concepts.map((c) => (
             <ConceptRow key={c.kc_code} c={c} revise={revise} />
           ))}
         </ul>
       )}
-
-      {concepts.length > PREVIEW ? (
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="mt-3 inline-flex items-center gap-1 text-[13px] font-medium text-brand transition-opacity hover:opacity-70"
-        >
-          {expanded ? "Show fewer" : `See all ${concepts.length}`}
-          {!expanded ? <ArrowRight className="size-3.5" strokeWidth={2.25} aria-hidden="true" /> : null}
-        </button>
-      ) : null}
     </div>
   );
 }

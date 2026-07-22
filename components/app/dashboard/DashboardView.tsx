@@ -418,6 +418,11 @@ export function DashboardView({
     label: `${trendOffset + i + 1}`,
     title: `${a.mock_title} · ${formatDate(a.submitted_at)}`,
     value: a.accuracy_pct,
+    // Accuracy + percentile together, when the backend has a percentile for it.
+    pill:
+      a.percentile != null
+        ? `${formatPct(a.accuracy_pct)} · ${a.percentile.toFixed(1)} %ile`
+        : formatPct(a.accuracy_pct),
   }));
 
   return (
