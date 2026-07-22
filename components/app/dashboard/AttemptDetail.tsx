@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { Download, Sparkles, X } from "lucide-react";
 import { Panel } from "@/components/app/Panel";
 import { QuestionGrid } from "@/components/app/dashboard/QuestionGrid";
 import { Skeleton } from "@/components/app/Skeleton";
@@ -98,16 +98,40 @@ export function AttemptDetail({
     };
   }, [attemptId, onUnauthorized]);
 
+  // Print just this report: `print-attempt` on <body> hides everything tagged
+  // .print-dash (see globals.css), so window.print() captures only this region.
+  function downloadPdf() {
+    document.body.classList.add("print-attempt");
+    const cleanup = () => {
+      document.body.classList.remove("print-attempt");
+      window.removeEventListener("afterprint", cleanup);
+    };
+    window.addEventListener("afterprint", cleanup);
+    window.print();
+  }
+
   return (
     <div className="animate-step-in flex flex-col gap-6">
-      <button
-        type="button"
-        onClick={onBack}
-        className="inline-flex w-fit items-center gap-1.5 text-[14px] font-medium text-brand transition-opacity hover:opacity-70"
-      >
-        <ArrowLeft className="size-4" strokeWidth={2} aria-hidden="true" />
-        Back to dashboard
-      </button>
+      <div className="flex items-center justify-between gap-3 print:hidden">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-1.5 text-[14px] font-medium text-brand transition-opacity hover:opacity-70"
+        >
+          <X className="size-4" strokeWidth={2} aria-hidden="true" />
+          Close report
+        </button>
+        {data ? (
+          <button
+            type="button"
+            onClick={downloadPdf}
+            className="inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-hairline bg-surface-card px-3 text-[13px] font-medium text-ink transition-colors hover:bg-surface-field"
+          >
+            <Download className="size-3.5" strokeWidth={2} aria-hidden="true" />
+            Download PDF
+          </button>
+        ) : null}
+      </div>
 
       {loading ? (
         <div role="status" aria-busy="true" aria-label="Loading attempt" className="flex flex-col gap-4">

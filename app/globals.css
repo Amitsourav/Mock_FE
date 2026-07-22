@@ -42,6 +42,19 @@
   --mastery-developing: #ee7733;
   --mastery-strong: #009988;
 
+  /* Aurora + liquid glass (dashboard). The aurora hues sit analogous to the
+     brand blue; the glass tokens hold the material recipe per scheme. */
+  --aurora-1: #8fb5ff;
+  --aurora-2: #7fd8c6;
+  --aurora-3: #c4a8ff;
+  --glass-bg: color-mix(in srgb, #ffffff 62%, transparent);
+  --glass-edge-hi: rgba(255, 255, 255, 0.95);
+  --glass-edge-lo: rgba(255, 255, 255, 0.28);
+  --glass-sheen: rgba(255, 255, 255, 0.14);
+  --glass-dark-bg: color-mix(in srgb, #111318 84%, transparent);
+  --glass-dark-edge-hi: rgba(255, 255, 255, 0.4);
+  --glass-dark-edge-lo: rgba(255, 255, 255, 0.1);
+
   /* --- shadcn compatibility -------------------------------------------------
      Anything added later via `npx shadcn add …` expects these names. Aliasing
      them onto the tokens above means generated components inherit our palette
@@ -102,6 +115,19 @@
     --mastery-weak: #ff6b57;
     --mastery-developing: #ff9e4d;
     --mastery-strong: #2cc4ad;
+
+    /* Aurora dims to deep pools of colour; glass gets darker + lower-key rims.
+       The "dark" jewel card inverts to light glass (ink is light in this scheme). */
+    --aurora-1: #2b5fd9;
+    --aurora-2: #0e7f6e;
+    --aurora-3: #7a4fd9;
+    --glass-bg: color-mix(in srgb, #1c1c1e 58%, transparent);
+    --glass-edge-hi: rgba(255, 255, 255, 0.26);
+    --glass-edge-lo: rgba(255, 255, 255, 0.07);
+    --glass-sheen: rgba(255, 255, 255, 0.06);
+    --glass-dark-bg: color-mix(in srgb, #f5f5f7 88%, transparent);
+    --glass-dark-edge-hi: rgba(0, 0, 0, 0.22);
+    --glass-dark-edge-lo: rgba(0, 0, 0, 0.06);
 
     /* The shadcn aliases above are declared with var(), so they follow these
        automatically — only the two that resolve to literals need restating. */
@@ -259,6 +285,150 @@ body {
 .font-display {
   font-family: var(--font-display);
   font-optical-sizing: auto;
+}
+
+/* --- Liquid glass (iOS-26-style material) ----------------------------------
+   blur + a saturation boost (the "refraction pop"), a specular rim drawn as a
+   masked 1px gradient ring, and a faint diagonal sheen. Text always sits on the
+   semi-opaque fill, never raw over the aurora. Falls back to solid cards when
+   backdrop-filter is unsupported or the user prefers reduced transparency.
+-------------------------------------------------------------------------- */
+.glass-tile,
+.glass-dark {
+  position: relative;
+  isolation: isolate;
+  -webkit-backdrop-filter: blur(10px) saturate(1.7);
+  backdrop-filter: blur(10px) saturate(1.7);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 12px 32px rgba(15, 23, 42, 0.09);
+}
+.glass-tile {
+  background: var(--glass-bg);
+}
+.glass-dark {
+  background: var(--glass-dark-bg);
+}
+
+/* Specular rim: a 1px gradient ring, brightest where light would catch it. */
+.glass-tile::before,
+.glass-dark::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+.glass-tile::before {
+  background: linear-gradient(
+    135deg,
+    var(--glass-edge-hi),
+    var(--glass-edge-lo) 35%,
+    var(--glass-edge-lo) 65%,
+    var(--glass-edge-hi)
+  );
+}
+.glass-dark::before {
+  background: linear-gradient(
+    135deg,
+    var(--glass-dark-edge-hi),
+    var(--glass-dark-edge-lo) 40%,
+    var(--glass-dark-edge-lo) 70%,
+    var(--glass-dark-edge-hi)
+  );
+}
+
+/* Sheen: one still, diagonal light streak. Decorative, so it never intercepts. */
+.glass-tile::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 42%, var(--glass-sheen) 50%, transparent 58%);
+}
+
+/* Hover lift (micro-interaction layer). Pointer devices only. */
+@media (hover: hover) {
+  .glass-hover {
+    transition:
+      transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 280ms ease;
+  }
+  .glass-hover:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 2px 4px rgba(15, 23, 42, 0.07), 0 22px 48px rgba(15, 23, 42, 0.15);
+  }
+}
+
+/* Graceful degradation → the solid-card look. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-tile {
+    background: var(--surface-card);
+  }
+  .glass-dark {
+    background: var(--ink);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .glass-tile,
+  .glass-dark {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .glass-tile {
+    background: var(--surface-card);
+  }
+  .glass-dark {
+    background: var(--ink);
+  }
+  .glass-tile::after {
+    display: none;
+  }
+}
+
+/* Film grain over the aurora — kills the "rendered gradient" plastic look. */
+.grain-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.4;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E");
+}
+@media (prefers-color-scheme: dark) {
+  .grain-layer {
+    opacity: 0.22;
+    mix-blend-mode: soft-light;
+  }
+}
+
+/* Lollipop stems rise in sequence; dots and pills fade after. */
+@keyframes stem-rise {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+@keyframes fade-in-soft {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.animate-stem {
+  transform-origin: bottom;
+  animation: stem-rise 700ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.animate-dot {
+  animation: fade-in-soft 300ms ease-out backwards;
 }
 
 .animate-shake {
@@ -421,6 +591,54 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* --- Print / PDF export ----------------------------------------------------
+   "Download PDF" = window.print() → the browser's Save-as-PDF. App chrome hides
+   via Tailwind's print:hidden. Printing a SINGLE attempt report adds
+   `print-attempt` to <body>, which hides everything tagged .print-dash so only
+   the attempt report region remains.
+-------------------------------------------------------------------------- */
+@media print {
+  body {
+    background: #fff !important;
+  }
+  *,
+  *::before,
+  *::after {
+    box-shadow: none !important;
+    animation: none !important;
+    transition: none !important;
+  }
+  /* reveal uses `backwards` fill — without this, delayed sections print blank */
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  body.print-attempt .print-dash {
+    display: none !important;
+  }
+  /* Glass prints as solid paper cards; atmosphere layers vanish. */
+  .glass-tile,
+  .glass-dark {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+  .glass-tile {
+    background: #fff !important;
+    border: 1px solid rgba(0, 0, 0, 0.15) !important;
+  }
+  .glass-dark {
+    background: #111318 !important;
+  }
+  .glass-tile::before,
+  .glass-tile::after,
+  .glass-dark::before {
+    display: none !important;
+  }
+  .grain-layer {
+    display: none !important;
   }
 }
 

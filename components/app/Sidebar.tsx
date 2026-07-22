@@ -54,7 +54,7 @@ export function Sidebar({
   onNavigate: (view: AppView) => void;
 }) {
   return (
-    <aside className="hidden w-[240px] shrink-0 flex-col border-r border-hairline bg-surface-card px-4 py-6 md:flex">
+    <aside className="hidden w-[240px] shrink-0 flex-col border-r border-hairline bg-surface-card px-4 py-6 md:flex print:hidden">
       <div className="mb-8 flex items-center gap-2 px-3">
         <span className="text-[17px] font-semibold tracking-[-0.01em] text-ink">dMAT</span>
         <span className="text-[13px] text-ink-secondary">Mock</span>
@@ -77,7 +77,7 @@ export function MobileNav({
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-30 flex border-t border-hairline bg-surface-card/95 backdrop-blur-md md:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 flex border-t border-hairline bg-surface-card/95 backdrop-blur-md md:hidden print:hidden"
     >
       {NAV.map(({ view: v, label, Icon }) => {
         const active = view === v;

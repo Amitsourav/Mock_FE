@@ -6,6 +6,7 @@ import { ComingSoonModal } from "@/components/app/ComingSoonModal";
 import { MobileNav, Sidebar } from "@/components/app/Sidebar";
 import type { AppView } from "@/components/app/Sidebar";
 import { ProfileMenu } from "@/components/app/ProfileMenu";
+import { AuroraField } from "@/components/app/dashboard/AuroraField";
 import { DashboardView } from "@/components/app/dashboard/DashboardView";
 import { MockTestView } from "@/components/app/mocks/MockTestView";
 import { ExamPlayer } from "@/components/app/exam/ExamPlayer";
@@ -100,7 +101,7 @@ export function AppShell({
 
         <div className="flex min-w-0 flex-1 flex-col">
           {/* Top bar: current section + profile menu. Sticky so the menu is always reachable. */}
-          <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-hairline bg-surface/85 px-5 backdrop-blur-md sm:px-8">
+          <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-hairline bg-surface/85 px-5 backdrop-blur-md sm:px-8 print:hidden">
             <h1 className="text-[17px] font-semibold tracking-[-0.01em] text-ink">
               {VIEW_TITLE[view]}
             </h1>
@@ -113,10 +114,25 @@ export function AppShell({
             />
           </header>
 
-          <main className="flex-1 px-5 pb-24 pt-6 sm:px-8 md:pb-10">
-            <div className="mx-auto w-full max-w-[1120px]">
+          {/* The dashboard sits on the soft field frame with the aurora glowing
+              behind its glass tiles; other views keep the plain surface. */}
+          <main
+            className={
+              view === "dashboard"
+                ? "relative flex-1 bg-surface-field px-5 pb-24 pt-6 sm:px-8 md:pb-10 print:bg-white"
+                : "flex-1 px-5 pb-24 pt-6 sm:px-8 md:pb-10"
+            }
+          >
+            {view === "dashboard" ? <AuroraField /> : null}
+            <div
+              className={
+                view === "dashboard"
+                  ? "relative mx-auto w-full max-w-[1200px]"
+                  : "mx-auto w-full max-w-[1120px]"
+              }
+            >
               {view === "dashboard" ? (
-                <DashboardView onUnauthorized={onUnauthorized} />
+                <DashboardView user={user} onUnauthorized={onUnauthorized} />
               ) : (
                 <MockTestView
                   user={user}

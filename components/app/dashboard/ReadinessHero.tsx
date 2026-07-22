@@ -1,6 +1,6 @@
 "use client";
 
-import type { DashboardInsight, DashboardSummary } from "@/lib/types";
+import type { DashboardInsight } from "@/lib/types";
 import { useCountUp } from "@/components/app/dashboard/useCountUp";
 
 const R = 138;
@@ -31,14 +31,9 @@ function verdictOf(summary: string): string {
  * is the centrepiece — oversized display type inside a calm arc gauge, with the
  * likely band drawn as a confidence range and a one-line verdict from the AI.
  * The arc draws and the number counts up on load (both respect reduced motion).
+ * Supporting numbers live in the KPI strip beside/below it, not in here.
  */
-export function ReadinessHero({
-  insight,
-  summary,
-}: {
-  insight: DashboardInsight;
-  summary: DashboardSummary;
-}) {
+export function ReadinessHero({ insight }: { insight: DashboardInsight }) {
   const predicted = Math.max(0, Math.min(100, insight.predicted_score));
   const low = Math.max(0, Math.min(100, insight.predicted_band_low));
   const high = Math.max(0, Math.min(100, insight.predicted_band_high));
@@ -49,7 +44,7 @@ export function ReadinessHero({
   return (
     <section
       aria-labelledby="readiness-heading"
-      className="reveal relative overflow-hidden rounded-[24px] border border-hairline bg-surface-card px-6 py-8 shadow-[var(--shadow-card)] sm:px-10 sm:py-10"
+      className="glass-tile glass-hover reveal relative overflow-hidden rounded-[20px] px-6 py-7"
     >
       {/* Ambient light — quiet, never busy. */}
       <div
@@ -57,9 +52,9 @@ export function ReadinessHero({
         className="pointer-events-none absolute inset-x-0 -top-24 mx-auto h-64 w-[70%] rounded-full bg-brand-fill/10 blur-[90px]"
       />
 
-      <div className="relative flex flex-col items-center gap-8 lg:flex-row lg:items-center lg:justify-center lg:gap-14">
+      <div className="relative flex flex-col items-center gap-6">
         {/* Gauge + number */}
-        <div className="relative w-full max-w-[360px]">
+        <div className="relative w-full max-w-[340px]">
           <svg viewBox="0 0 320 190" className="w-full" role="img" aria-label={`Predicted score ${Math.round(predicted)} out of 100, likely range ${Math.round(low)} to ${Math.round(high)}.`}>
             <defs>
               <linearGradient id="readiness-fill" x1="0" y1="0" x2="1" y2="0">
@@ -96,7 +91,7 @@ export function ReadinessHero({
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-ink-secondary">
               Exam readiness
             </p>
-            <p className="font-display text-[76px] font-semibold leading-[0.9] tracking-[-0.02em] text-ink sm:text-[88px]" style={{ fontVariantNumeric: "tabular-nums" }}>
+            <p className="font-display text-[68px] font-semibold leading-[0.9] tracking-[-0.02em] text-ink sm:text-[76px]" style={{ fontVariantNumeric: "tabular-nums" }}>
               {shown}
             </p>
             <p className="text-[13px] text-ink-secondary">
@@ -108,39 +103,16 @@ export function ReadinessHero({
           </div>
         </div>
 
-        {/* Verdict + context */}
-        <div className="max-w-[420px] text-center lg:text-left">
+        {/* Verdict */}
+        <div className="max-w-[400px] text-center">
           <h1 id="readiness-heading" className="sr-only">
             Exam readiness
           </h1>
-          <p className="font-display text-[24px] font-medium leading-snug tracking-[-0.01em] text-ink sm:text-[27px]">
+          <p className="font-display text-[19px] font-medium leading-snug tracking-[-0.01em] text-ink sm:text-[21px]">
             {verdictOf(insight.summary)}
           </p>
-          <div className="mt-6 flex flex-wrap justify-center gap-2.5 lg:justify-start">
-            <HeroChip label="Latest percentile" value={summary.latest_percentile.toFixed(1)} />
-            <HeroChip label="Mocks taken" value={`${summary.total_attempts}`} />
-            <HeroChip
-              label="Improvement"
-              value={`${summary.improvement_pct >= 0 ? "+" : ""}${summary.improvement_pct.toFixed(1)}%`}
-              good={summary.improvement_pct >= 0}
-            />
-          </div>
         </div>
       </div>
     </section>
-  );
-}
-
-function HeroChip({ label, value, good }: { label: string; value: string; good?: boolean }) {
-  return (
-    <span className="inline-flex items-baseline gap-1.5 rounded-full border border-hairline bg-surface px-3 py-1.5">
-      <span
-        className={`text-[14px] font-semibold ${good === undefined ? "text-ink" : good ? "text-success" : "text-error"}`}
-        style={{ fontVariantNumeric: "tabular-nums" }}
-      >
-        {value}
-      </span>
-      <span className="text-[12px] text-ink-secondary">{label}</span>
-    </span>
   );
 }
