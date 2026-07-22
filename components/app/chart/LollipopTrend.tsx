@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 export type LollipopPoint = {
@@ -28,8 +29,13 @@ export function LollipopTrend({
   max?: number;
   format?: (v: number) => string;
 }) {
+  // Hovering any column moves the pill (and dot emphasis) to that attempt.
+  // (Declared before the empty-points return — hooks must run unconditionally.)
+  const [hover, setHover] = useState<number | null>(null);
+
   if (points.length === 0) return null;
-  const hi = points.length - 1; // latest attempt carries the highlight
+  const hi = points.length - 1; // latest attempt carries the highlight by default
+  const active = hover ?? hi;
 
   const heightPct = (v: number) => Math.max((Math.max(0, Math.min(max, v)) / max) * 100, 3);
   // Column centres in a gapless equal-width flex row → exact (i + ½)/n.
@@ -79,34 +85,59 @@ export function LollipopTrend({
           {points.map((p, i) => {
             const pct = heightPct(p.value);
             const isHi = i === hi;
+            const isActive = i === active;
             return (
-              <div key={i} className="relative h-40 min-w-0 flex-1" title={`${p.title} — ${p.pill ?? format(p.value)}`}>
+              <div
+                key={i}
+                className="relative h-40 min-w-0 flex-1"
+                onMouseEnter={() => setHover(i)}
+                onMouseLeave={() => setHover(null)}
+              >
                 {/* stem — every mock gets a solid ink line; they rise in sequence */}
                 <div
                   className="animate-stem absolute bottom-0 left-1/2 w-[2.5px] -translate-x-1/2 rounded-full bg-ink"
                   style={{ height: `${pct}%`, animationDelay: `${i * 55}ms` }}
                 />
-                {/* dot head */}
+                {/* dot head — grows slightly while its pill is showing */}
                 <div
                   className={cn(
-                    "animate-dot absolute left-1/2 size-2.5 -translate-x-1/2 rounded-full ring-2 ring-surface-card",
-                    isHi ? "bg-ink" : "bg-brand"
+                    "animate-dot absolute left-1/2 size-2.5 -translate-x-1/2 rounded-full ring-2 ring-surface-card transition-transform duration-150",
+                    isHi ? "bg-ink" : "bg-brand",
+                    isActive && "scale-125"
                   )}
                   style={{
                     bottom: `calc(${pct}% - 4px)`,
                     animationDelay: `${i * 55 + 320}ms`,
                   }}
                 />
-                {/* tooltip pill on the highlighted stem */}
-                {isHi ? (
+                {/* tooltip pill — follows the hovered attempt, rests on the latest.
+                    Entrance animation only applies to the resting pill; a hovered
+                    pill must appear instantly (no staggered delay). */}
+                {isActive ? (
                   <span
-                    className="animate-dot absolute left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-ink px-2.5 py-1 text-[11px] font-semibold text-surface"
+                    className={cn(
+                      "absolute left-1/2 z-10 -translate-x-1/2 whitespace-nowrap bg-ink text-surface",
+                      hover === null
+                        ? "animate-dot rounded-full px-2.5 py-1 text-[11px] font-semibold"
+                        : "rounded-[10px] px-3 py-1.5 text-center"
+                    )}
                     style={{
                       bottom: `calc(${pct}% + 10px)`,
-                      animationDelay: `${i * 55 + 420}ms`,
+                      ...(hover === null ? { animationDelay: `${i * 55 + 420}ms` } : {}),
                     }}
                   >
-                    {p.pill ?? format(p.value)}
+                    {hover === null ? (
+                      p.pill ?? format(p.value)
+                    ) : (
+                      <>
+                        <span className="block max-w-[260px] truncate text-[10px] text-surface/70">
+                          {p.title}
+                        </span>
+                        <span className="block text-[11px] font-semibold">
+                          {p.pill ?? format(p.value)}
+                        </span>
+                      </>
+                    )}
                   </span>
                 ) : null}
               </div>
