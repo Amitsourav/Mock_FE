@@ -112,11 +112,6 @@ function monogram(name: string): string {
   return ((words[0]?.[0] ?? name[0] ?? "?") + (words[1]?.[0] ?? "")).toUpperCase();
 }
 
-/** Airport-style city code: "Aalen" → AAL. */
-function cityCode(city: string): string {
-  return city.replace(/[^A-Za-zÄÖÜäöü]/g, "").slice(0, 3).toUpperCase();
-}
-
 /** Programmes grouped by university, preserving the backend's order. */
 function groupByUniversity(programs: TargetProgram[]): [string, TargetProgram[]][] {
   const groups = new Map<string, TargetProgram[]>();

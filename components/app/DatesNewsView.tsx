@@ -444,7 +444,7 @@ export function DatesNewsView({ onUnauthorized }: { onUnauthorized: () => void }
                 </div>
               ) : (
                 <p className="mt-6 text-center text-[11px] uppercase tracking-[0.14em] text-ink-secondary">
-                  You're all caught up · Confirm on official pages before travelling or paying fees
+                  You&apos;re all caught up · Confirm on official pages before travelling or paying fees
                 </p>
               )}
             </>
