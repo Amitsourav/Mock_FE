@@ -1,15 +1,24 @@
 "use client";
 
-import { BarChart3, ClipboardList } from "lucide-react";
+import { BarChart3, CalendarDays, ClipboardList, GraduationCap, Trophy } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // "exam" is a full-screen takeover, not a nav destination, so it's absent from NAV.
-export type AppView = "dashboard" | "mocks" | "exam";
+export type AppView = "dashboard" | "mocks" | "leaderboard" | "colleges" | "dates" | "exam";
 
-const NAV: { view: Exclude<AppView, "exam">; label: string; Icon: LucideIcon }[] = [
+const NAV: {
+  view: Exclude<AppView, "exam">;
+  label: string;
+  /** Compact label for the mobile bottom bar. */
+  short?: string;
+  Icon: LucideIcon;
+}[] = [
   { view: "dashboard", label: "Dashboard", Icon: BarChart3 },
-  { view: "mocks", label: "Mock Test", Icon: ClipboardList },
+  { view: "mocks", label: "Mock Test", short: "Mocks", Icon: ClipboardList },
+  { view: "leaderboard", label: "Leaderboard", short: "Ranks", Icon: Trophy },
+  { view: "colleges", label: "College Predictor", short: "Colleges", Icon: GraduationCap },
+  { view: "dates", label: "Dates & News", short: "Dates", Icon: CalendarDays },
 ];
 
 function NavItems({
@@ -79,7 +88,7 @@ export function MobileNav({
       aria-label="Primary"
       className="fixed inset-x-0 bottom-0 z-30 flex border-t border-hairline bg-surface-card/95 backdrop-blur-md md:hidden print:hidden"
     >
-      {NAV.map(({ view: v, label, Icon }) => {
+      {NAV.map(({ view: v, label, short, Icon }) => {
         const active = view === v;
         return (
           <button
@@ -93,7 +102,7 @@ export function MobileNav({
             )}
           >
             <Icon className="size-5" strokeWidth={2} aria-hidden="true" />
-            {label}
+            {short ?? label}
           </button>
         );
       })}

@@ -252,6 +252,184 @@ export type StrategyData = {
   pacing_note: string;
 };
 
+// --- Leaderboard ------------------------------------------------------------
+
+export type LeaderboardEntry = {
+  rank: number;
+  display_name: string; // already display-safe (first name + initial)
+  value: number;
+  is_me: boolean;
+  /** Rank movement vs the previous period (+2 = climbed two places). Optional —
+   *  backend contract extension; the UI hides arrows when absent. */
+  delta_rank?: number | null;
+};
+
+export type LeaderboardOut = {
+  scope: string; // "stream"
+  metric: string; // e.g. "best_score"
+  stream_code?: string | null;
+  /** Optional contract extension: which period this board covers. */
+  timeframe?: "week" | "all";
+  entries: LeaderboardEntry[]; // top-10, sorted
+  /** Optional contract extension: the ranks immediately around the student,
+   *  for when they sit outside the visible top-10. */
+  around_me?: LeaderboardEntry[];
+  me: {
+    rank: number | null;
+    value: number | null;
+    total_participants: number;
+    /** Optional contract extension: my rank movement vs the previous period. */
+    delta_rank?: number | null;
+  };
+};
+
+// --- Share links ------------------------------------------------------------
+
+export type SharePayload = {
+  scope: "dashboard" | "attempt" | "leaderboard";
+  attempt_id?: string;
+};
+
+export type ShareLinkOut = { token: string; url: string; expires_at: string | null };
+
+/** The frozen dashboard snapshot served publicly by GET /share/{token}. */
+export type SharedDashboardSnapshot = {
+  scope: "dashboard";
+  shared_by: string;
+  generated_at: string;
+  summary: DashboardSummary;
+  insight: DashboardInsight | null;
+  skills: SkillStat[];
+  concepts: ConceptMastery[];
+  strategy: StrategyData | null;
+  attempts: AttemptListItem[];
+};
+
+/** The frozen single-attempt snapshot. `attempt` is the attempt-detail shape. */
+export type SharedAttemptSnapshot = {
+  scope: "attempt";
+  shared_by: string;
+  generated_at: string;
+  attempt: AttemptDetail;
+};
+
+/** The frozen leaderboard snapshot — `is_me` in it marks the SHARER's rows. */
+export type SharedLeaderboardSnapshot = {
+  scope: "leaderboard";
+  shared_by: string;
+  generated_at: string;
+  leaderboard: LeaderboardOut;
+};
+
+export type SharedReport =
+  | SharedDashboardSnapshot
+  | SharedAttemptSnapshot
+  | SharedLeaderboardSnapshot;
+
+// --- College predictor (dMAT → German Master's readiness) -------------------
+
+/** Anabin recognition status: "H+" recognized · "H+/-" case-by-case · "H-" not recognized. */
+export type AnabinInstitution = {
+  id: string;
+  name: string;
+  city: string | null;
+  state: string | null;
+  institution_type: string | null;
+  status: string;
+};
+
+/** The three UG fields that trigger the dMAT requirement. Anything else → 422. */
+export type DmatField = "engineering" | "commerce_finance_economics" | "business_management";
+
+export type AcademicsPayload = {
+  ug_percentage?: number | null;
+  twelfth_percentage?: number | null;
+  dmat_field?: DmatField | null;
+};
+
+export type PredictionEligibility = {
+  institution_id: string;
+  institution_name: string;
+  status: string;
+  recognized: boolean;
+  meaning: string;
+};
+
+export type CollegeReadiness =
+  | "strong"
+  | "target"
+  | "reach"
+  | "low"
+  | "eligibility_risk"
+  | "unknown";
+
+/** "Show the working" — every sub-score behind the readiness number. */
+export type PredictionBreakdown = {
+  ug_percentage?: number | null;
+  german_grade?: number | null;
+  academic_score?: number | null;
+  dmat_percentile?: number | null;
+  dmat_score?: number | null;
+  twelfth_percentage?: number | null;
+  twelfth_score?: number | null;
+  competitiveness?: number | null;
+  eligibility_multiplier?: number | null;
+  readiness_score?: number | null;
+};
+
+export type CollegePrediction = {
+  applicable: boolean;
+  eligibility: PredictionEligibility | null;
+  dmat: { percentile: number; band: string; best_score: number } | null;
+  readiness: CollegeReadiness;
+  readiness_note: string;
+  readiness_score: number | null;
+  breakdown: PredictionBreakdown | null;
+  missing_inputs: string[];
+  /** The MAIN admission story: dMAT = APS entry ticket to all public
+   *  universities in the field from Summer 2027. Render prominently. */
+  dmat_admission_note: string;
+  /** Still returned by the backend but UNUSED by the UI — the ticket now shows
+   *  real public universities from /dashboard/target-programs instead. */
+  universities_scoring_dmat: { name: string; program: string; note: string }[];
+  disclaimer: string;
+};
+
+export type TargetProgram = {
+  name: string;
+  university: string;
+  city: string | null;
+  languages: string[];
+  subject: string | null;
+  tuition: string | null;
+  duration: string | null;
+  application_deadline: string | null;
+  link: string | null;
+  /** "open" = zulassungsfrei · "restricted" = NC/selective · null = unknown →
+   *  render NOTHING (the data source is gated; most values are null for now). */
+  admission_mode?: "open" | "restricted" | null;
+  /** Application-list bucket. safe = Fallback · target = Moderate · reach = Aim.
+   *  Eligibility is already baked in server-side (only recognized H+ degrees get "safe"). */
+  tier?: "safe" | "target" | "reach" | null;
+};
+
+export type TargetProgramsOut = {
+  applicable: boolean;
+  eligibility: PredictionEligibility | null;
+  /** The student's dMAT field (defaults server-side to their saved one); null → prompt to pick. */
+  field: { key: DmatField; label: string } | null;
+  /** Always true — private universities are filtered out server-side. */
+  public_only: boolean;
+  /** Admission-mode counts over the whole matched set. Show the headline only
+   *  when open + restricted > 0 — never render "0 open · 0 restricted". */
+  admission_summary?: { open: number; restricted: number; unknown: number };
+  /** Counts for the 3 buckets over the whole matched set. */
+  tier_summary: { safe: number; target: number; reach: number };
+  total_matched: number;
+  programs: TargetProgram[];
+  note: string;
+};
+
 // --- Test player (attempt + paper) -----------------------------------------
 
 export type AttemptState = {
@@ -303,4 +481,34 @@ export type Paper = {
   total_questions: number;
   sections: PaperSection[];
   questions: PaperQuestion[];
+};
+
+// --- Dates & News (backend ingestion) --------------------------------------
+
+/** A schedule milestone. `date` is ISO yyyy-mm-dd, or null for undated ones. */
+export type ImportantDate = {
+  label: string;
+  date: string | null;
+  /** Human form to render, e.g. "15 Sep 2026" or "Summer 2027". */
+  display: string;
+};
+
+export type NewsCategory =
+  | "aps"
+  | "dmat"
+  | "visa"
+  | "exams"
+  | "scholarships"
+  | "deadlines"
+  | "general";
+
+export type NewsItem = {
+  id: string;
+  source_name: string;
+  /** Null for items scraped from prose (no page of their own). */
+  url: string | null;
+  title: string;
+  summary: string | null;
+  category: NewsCategory;
+  published_at: string;
 };

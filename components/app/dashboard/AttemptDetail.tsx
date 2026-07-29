@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Download, Sparkles, X } from "lucide-react";
 import { Panel } from "@/components/app/Panel";
 import { QuestionGrid } from "@/components/app/dashboard/QuestionGrid";
+import { ShareButton } from "@/components/app/dashboard/ShareButton";
 import { Skeleton } from "@/components/app/Skeleton";
 import { ApiError, getAttemptDetail } from "@/lib/api";
 import { formatDate, formatMs, formatPct } from "@/lib/format";
@@ -65,16 +66,23 @@ export function AttemptDetail({
   attemptId,
   onBack,
   onUnauthorized,
+  snapshot,
+  readOnly = false,
 }: {
   attemptId: string;
   onBack: () => void;
   onUnauthorized: () => void;
+  /** Pre-fetched frozen data (public share page) — skips the authed fetch. */
+  snapshot?: AttemptDetailData;
+  /** Hide owner-only controls (Close, Share) — the public share page. */
+  readOnly?: boolean;
 }) {
-  const [data, setData] = useState<AttemptDetailData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<AttemptDetailData | null>(snapshot ?? null);
+  const [loading, setLoading] = useState(!snapshot);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (snapshot) return; // frozen share payload — nothing to fetch
     let active = true;
     setLoading(true);
     setError(null);
@@ -96,7 +104,7 @@ export function AttemptDetail({
     return () => {
       active = false;
     };
-  }, [attemptId, onUnauthorized]);
+  }, [attemptId, onUnauthorized, snapshot]);
 
   // Print just this report: `print-attempt` on <body> hides everything tagged
   // .print-dash (see globals.css), so window.print() captures only this region.
@@ -113,23 +121,32 @@ export function AttemptDetail({
   return (
     <div className="animate-step-in flex flex-col gap-6">
       <div className="flex items-center justify-between gap-3 print:hidden">
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-1.5 text-[14px] font-medium text-brand transition-opacity hover:opacity-70"
-        >
-          <X className="size-4" strokeWidth={2} aria-hidden="true" />
-          Close report
-        </button>
-        {data ? (
+        {!readOnly ? (
           <button
             type="button"
-            onClick={downloadPdf}
-            className="inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-hairline bg-surface-card px-3 text-[13px] font-medium text-ink transition-colors hover:bg-surface-field"
+            onClick={onBack}
+            className="inline-flex items-center gap-1.5 text-[14px] font-medium text-brand transition-opacity hover:opacity-70"
           >
-            <Download className="size-3.5" strokeWidth={2} aria-hidden="true" />
-            Download PDF
+            <X className="size-4" strokeWidth={2} aria-hidden="true" />
+            Close report
           </button>
+        ) : (
+          <span />
+        )}
+        {data ? (
+          <div className="flex items-center gap-2">
+            {!readOnly ? (
+              <ShareButton scope="attempt" attemptId={attemptId} onUnauthorized={onUnauthorized} />
+            ) : null}
+            <button
+              type="button"
+              onClick={downloadPdf}
+              className="inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-hairline bg-surface-card px-3 text-[13px] font-medium text-ink transition-colors hover:bg-surface-field"
+            >
+              <Download className="size-3.5" strokeWidth={2} aria-hidden="true" />
+              Download PDF
+            </button>
+          </div>
         ) : null}
       </div>
 

@@ -70,7 +70,10 @@ Attempt history (**with inline detail**). *(Your coach's read & Skill map remain
 
 ---
 
-## Task 3 — Leaderboard
+## Task 3 — Leaderboard  ✅ FRONTEND BUILT (2026-07-22) — awaiting backend endpoint
+
+Frontend ships `LeaderboardTile` on the dashboard (self-fetching `GET /dashboard/leaderboard`,
+top-10 + pinned "You" row, empty + error states). Goes live the moment the endpoint responds.
 
 **What you want:** Add a **leaderboard** to the dashboard.
 
@@ -89,7 +92,12 @@ current user's rank/position.
 
 ---
 
-## Task 4 — Share feature (share dashboard + a single exam report)
+## Task 4 — Share feature  ✅ FRONTEND BUILT (2026-07-22) — awaiting backend endpoints
+
+Frontend ships: `ShareButton` (dashboard + attempt reports → `POST /share`, copy/OS-share/
+revoke modal) and the public route `/share/[token]` (no auth, renders the frozen snapshot with
+the dashboard components read-only; generic "unavailable" on 404). Live once `POST /share`,
+`GET /share/{token}` (public) and `POST /share/{token}/revoke` respond per the agreed contract.
 
 **What you want:** Let a student **share** their dashboard, and share a **single exam report**.
 

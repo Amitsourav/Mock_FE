@@ -39,7 +39,7 @@ type Phase =
   | { name: "ready" } // paper loaded; awaiting the fullscreen "Begin" gesture
   | { name: "playing" }
   | { name: "submitting" }
-  | { name: "submitted"; message: string };
+  | { name: "submitted"; message: string; resultId?: string | null };
 
 /**
  * The full-screen dMAT test player: a linear Next/Back sequence over the whole
@@ -50,10 +50,12 @@ type Phase =
 export function ExamPlayer({
   examinationId,
   onExit,
+  onViewResult,
   onUnauthorized,
 }: {
   examinationId: string;
   onExit: () => void;
+  onViewResult?: (resultId: string) => void;
   onUnauthorized: () => void;
 }) {
   const [phase, setPhase] = useState<Phase>({ name: "loading" });
@@ -85,7 +87,7 @@ export function ExamPlayer({
       setPhase({ name: "submitting" });
       try {
         const res = await submitAttempt(attemptIdRef.current);
-        setPhase({ name: "submitted", message: res.message || SUBMIT_FALLBACK });
+        setPhase({ name: "submitted", message: res.message || SUBMIT_FALLBACK, resultId: res.result_id });
       } catch (error) {
         if (error instanceof ApiError && error.unauthorized) {
           onUnauthorized();
@@ -330,10 +332,25 @@ export function ExamPlayer({
           {submitted ? phase.message : "Finalising your answers."}
         </p>
         {submitted ? (
-          <div className="mt-7 w-[240px]">
-            <Button type="button" onClick={onExit} autoFocus>
-              Back to mocks
-            </Button>
+          <div className="mt-7 flex w-[240px] flex-col gap-2.5">
+            {phase.resultId && onViewResult ? (
+              <>
+                <Button type="button" onClick={() => onViewResult(phase.resultId as string)} autoFocus>
+                  View my result
+                </Button>
+                <button
+                  type="button"
+                  onClick={onExit}
+                  className="text-[14px] font-medium text-ink-secondary transition-colors hover:text-ink"
+                >
+                  Back to mocks
+                </button>
+              </>
+            ) : (
+              <Button type="button" onClick={onExit} autoFocus>
+                Back to mocks
+              </Button>
+            )}
           </div>
         ) : null}
       </Centered>

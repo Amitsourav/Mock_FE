@@ -1,24 +1,36 @@
 import { getAccessToken } from "./supabase";
 import type {
+  AcademicsPayload,
+  AnabinInstitution,
   AttemptDetail,
   AttemptListItem,
   AttemptState,
   CatalogExam,
+  CollegePrediction,
+  DmatField,
   ConceptMastery,
   DashboardInsight,
   DashboardSummary,
   ExamSummary,
+  ImportantDate,
   IntegrityEvent,
+  LeaderboardOut,
+  NewsCategory,
+  NewsItem,
   MockTest,
   MockTestGroups,
   Paper,
   ProfilePayload,
   RefItem,
+  ShareLinkOut,
+  SharePayload,
+  SharedReport,
   SkillStat,
   StateItem,
   StrategyData,
   StreamOut,
   StreamPayload,
+  TargetProgramsOut,
   User,
 } from "./types";
 
@@ -200,6 +212,22 @@ export function getAttemptDetail(id: string) {
   return request<AttemptDetail>(`/dashboard/attempts/${encodeURIComponent(id)}`);
 }
 
+// --- Dates & News ----------------------------------------------------------
+
+/** The official schedule, chronological with undated milestones last. */
+export function getNewsDates() {
+  return request<{ items: ImportantDate[] }>("/news/dates");
+}
+
+/** The news feed, newest first. */
+export function getNews(params?: { category?: NewsCategory; limit?: number }) {
+  const qs = new URLSearchParams();
+  if (params?.category) qs.set("category", params.category);
+  if (params?.limit) qs.set("limit", String(params.limit));
+  const suffix = qs.size > 0 ? `?${qs}` : "";
+  return request<{ items: NewsItem[] }>(`/news${suffix}`);
+}
+
 // --- AI insight layer ------------------------------------------------------
 
 /** The headline story. Null when the user has no attempts yet. */
@@ -214,6 +242,96 @@ export function getConcepts() {
 
 export function getStrategy() {
   return request<StrategyData>("/dashboard/strategy");
+}
+
+// --- College predictor ------------------------------------------------------
+
+/** Anabin typeahead — call once the user has typed ≥2 characters. */
+export function searchAnabinInstitutions(q: string, limit = 10) {
+  return request<AnabinInstitution[]>(
+    `/reference/anabin-institutions?q=${encodeURIComponent(q)}&limit=${limit}`
+  );
+}
+
+/** Save the student's Indian university. 404 if the id is unknown. */
+export function saveAnabinInstitution(institutionId: string) {
+  return request<AnabinInstitution>("/me/anabin-institution", {
+    method: "POST",
+    body: JSON.stringify({ institution_id: institutionId }),
+  });
+}
+
+/** Save UG / Class-XII percentages. Either alone; 422 invalid_percentage outside 0–100. */
+export function saveAcademics(payload: AcademicsPayload) {
+  return request<AcademicsPayload>("/me/academics", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/** The readiness prediction. `applicable: false` → not a dMAT-stream student. */
+export function getCollegePredictions() {
+  return request<CollegePrediction>("/dashboard/college-predictions");
+}
+
+/**
+ * Public, tuition-free German Master's programmes in the student's dMAT field.
+ * `field` defaults server-side to their saved dmat_field; `q` refines by keyword.
+ */
+export function getTargetPrograms(opts: { q?: string; field?: DmatField; limit?: number } = {}) {
+  const params = new URLSearchParams();
+  if (opts.q) params.set("q", opts.q);
+  if (opts.field) params.set("field", opts.field);
+  params.set("limit", String(opts.limit ?? 20));
+  return request<TargetProgramsOut>(`/dashboard/target-programs?${params.toString()}`);
+}
+
+// --- Leaderboard ------------------------------------------------------------
+
+/** Top-10 within the user's stream + their own rank row. `timeframe`: all | week. */
+export function getLeaderboard(timeframe: "week" | "all" = "all") {
+  return request<LeaderboardOut>(`/dashboard/leaderboard?timeframe=${timeframe}`);
+}
+
+// --- Share links ------------------------------------------------------------
+
+/**
+ * Public fetch — NO Authorization header. The share page runs logged-out, so it
+ * must never go through `request()` (which demands a session token).
+ */
+async function publicRequest<T>(path: string): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(`${BASE_URL}${path}`, {
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch {
+    throw new ApiError(0, "Couldn't reach the server. Check your connection and try again.");
+  }
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    const { message, code } = readDetail(body);
+    throw new ApiError(response.status, message ?? "This link is unavailable or has expired.", code);
+  }
+  return response.json() as Promise<T>;
+}
+
+/** Create a share link for the dashboard or one attempt. */
+export function createShareLink(payload: SharePayload) {
+  return request<ShareLinkOut>("/share", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/** The frozen snapshot behind a share link. Public — works logged-out. 404 = gone. */
+export function getSharedReport(token: string) {
+  return publicRequest<SharedReport>(`/share/${encodeURIComponent(token)}`);
+}
+
+/** Kill a link (owner only). After this the public URL 404s. */
+export function revokeShareLink(token: string) {
+  return request<void>(`/share/${encodeURIComponent(token)}/revoke`, { method: "POST" });
 }
 
 // --- Test player (attempt + paper) -----------------------------------------
@@ -248,9 +366,9 @@ export function saveAnswer(
   );
 }
 
-/** Finalise the attempt. No scoring — returns a status message to show the user. */
+/** Finalise + score the attempt. Returns `result_id` (the scored report to open). */
 export function submitAttempt(attemptId: string) {
-  return request<{ status: string; message: string }>(
+  return request<{ status: string; message: string; result_id?: string | null }>(
     `/attempts/${encodeURIComponent(attemptId)}/submit`,
     { method: "POST" }
   );

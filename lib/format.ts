@@ -31,8 +31,12 @@ export function formatClock(totalSeconds: number): string {
   return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
 }
 
-/** Milliseconds → "1.4s" / "820ms" for per-question / per-skill timing. */
-export function formatMs(ms: number): string {
+/**
+ * Milliseconds → "1.4s" / "820ms" for per-question / per-skill timing.
+ * Timing isn't captured yet for real attempts, so 0/missing renders "—".
+ */
+export function formatMs(ms: number | null | undefined): string {
+  if (!ms || ms <= 0) return "—";
   if (ms >= 1000) return `${(ms / 1000).toFixed(1)}s`;
   return `${Math.round(ms)}ms`;
 }

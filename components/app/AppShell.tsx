@@ -8,6 +8,9 @@ import type { AppView } from "@/components/app/Sidebar";
 import { ProfileMenu } from "@/components/app/ProfileMenu";
 import { AuroraField } from "@/components/app/dashboard/AuroraField";
 import { DashboardView } from "@/components/app/dashboard/DashboardView";
+import { LeaderboardView } from "@/components/app/LeaderboardView";
+import { CollegePredictorView } from "@/components/app/CollegePredictorView";
+import { DatesNewsView } from "@/components/app/DatesNewsView";
 import { MockTestView } from "@/components/app/mocks/MockTestView";
 import { ExamPlayer } from "@/components/app/exam/ExamPlayer";
 import { ApiError, getStream } from "@/lib/api";
@@ -16,6 +19,9 @@ import type { StreamOut, User } from "@/lib/types";
 const VIEW_TITLE: Record<AppView, string> = {
   dashboard: "Dashboard",
   mocks: "Mock Test",
+  leaderboard: "Leaderboard",
+  colleges: "College Predictor",
+  dates: "Dates & News",
   exam: "Exam", // never shown — the exam view is a full-screen takeover
 };
 
@@ -35,6 +41,8 @@ export function AppShell({
 }) {
   const [view, setView] = useState<AppView>("dashboard");
   const [examId, setExamId] = useState<string | null>(null);
+  // The scored attempt to auto-open on the dashboard after a submit.
+  const [resultAttemptId, setResultAttemptId] = useState<string | null>(null);
   const [comingSoonOpen, setComingSoonOpen] = useState(false);
   // Drives the inline exam-stream discovery takeover when switching an existing
   // stream (a fresh, stream-less user gets it automatically via MockTestView).
@@ -73,6 +81,12 @@ export function AppShell({
     setExamId(null);
     setView("mocks");
   }, []);
+  // After scoring, jump straight to the graded report on the dashboard.
+  const viewResult = useCallback((resultId: string) => {
+    setExamId(null);
+    setResultAttemptId(resultId);
+    setView("dashboard");
+  }, []);
   // "Switch exam stream" / "Change" now open the inline discovery on the Mock
   // Test view rather than a modal.
   const openStreamPicker = useCallback(() => {
@@ -91,7 +105,14 @@ export function AppShell({
 
   // The test player takes the whole viewport — no sidebar, header or nav.
   if (view === "exam" && examId) {
-    return <ExamPlayer examinationId={examId} onExit={exitExam} onUnauthorized={onUnauthorized} />;
+    return (
+      <ExamPlayer
+        examinationId={examId}
+        onExit={exitExam}
+        onViewResult={viewResult}
+        onUnauthorized={onUnauthorized}
+      />
+    );
   }
 
   return (
@@ -114,25 +135,41 @@ export function AppShell({
             />
           </header>
 
-          {/* The dashboard sits on the soft field frame with the aurora glowing
-              behind its glass tiles; other views keep the plain surface. */}
+          {/* Report-family views (dashboard, leaderboard, colleges) sit on the
+              soft field frame with the aurora behind glass tiles; the mock
+              catalogue keeps the plain surface. */}
           <main
             className={
-              view === "dashboard"
+              view !== "mocks"
                 ? "relative flex-1 bg-surface-field px-5 pb-24 pt-6 sm:px-8 md:pb-10 print:bg-white"
                 : "flex-1 px-5 pb-24 pt-6 sm:px-8 md:pb-10"
             }
           >
-            {view === "dashboard" ? <AuroraField /> : null}
+            {view !== "mocks" ? <AuroraField /> : null}
             <div
               className={
-                view === "dashboard"
+                view !== "mocks"
                   ? "relative mx-auto w-full max-w-[1200px]"
                   : "mx-auto w-full max-w-[1120px]"
               }
             >
               {view === "dashboard" ? (
-                <DashboardView user={user} onUnauthorized={onUnauthorized} />
+                <DashboardView
+                  user={user}
+                  onUnauthorized={onUnauthorized}
+                  onOpenLeaderboard={() => setView("leaderboard")}
+                  initialAttemptId={resultAttemptId}
+                  onAttemptOpened={() => setResultAttemptId(null)}
+                />
+              ) : view === "leaderboard" ? (
+                <LeaderboardView
+                  onUnauthorized={onUnauthorized}
+                  onGoToMocks={() => setView("mocks")}
+                />
+              ) : view === "colleges" ? (
+                <CollegePredictorView onUnauthorized={onUnauthorized} />
+              ) : view === "dates" ? (
+                <DatesNewsView onUnauthorized={onUnauthorized} />
               ) : (
                 <MockTestView
                   user={user}

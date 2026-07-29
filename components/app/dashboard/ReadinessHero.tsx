@@ -16,8 +16,8 @@ function pointAt(frac: number): [number, number] {
 function arcPath(from: number, to: number): string {
   const [x1, y1] = pointAt(from);
   const [x2, y2] = pointAt(to);
-  const large = to - from > 0.5 ? 1 : 0;
-  return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${R} ${R} 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`;
+  // Spans never exceed the semicircle (180°), so the large-arc flag is always 0.
+  return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${R} ${R} 0 0 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`;
 }
 
 /** The first sentence of the AI summary — the one-line verdict. */

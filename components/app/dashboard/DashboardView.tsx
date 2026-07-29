@@ -18,6 +18,8 @@ import { ReadinessHero } from "@/components/app/dashboard/ReadinessHero";
 import { useCountUp } from "@/components/app/dashboard/useCountUp";
 import { AttemptsList } from "@/components/app/dashboard/AttemptsList";
 import { AttemptDetail } from "@/components/app/dashboard/AttemptDetail";
+import { LeaderboardTile } from "@/components/app/dashboard/LeaderboardTile";
+import { ShareButton } from "@/components/app/dashboard/ShareButton";
 import { LollipopTrend } from "@/components/app/chart/LollipopTrend";
 import type { LollipopPoint } from "@/components/app/chart/LollipopTrend";
 import { ErrorDonut } from "@/components/app/chart/ErrorDonut";
@@ -57,7 +59,7 @@ const TREND_LIMIT = 12;
 /* -------------------------------------------------------------------------- */
 
 /** A bento tile: white card, compact internal title, optional right-side action. */
-function Tile({
+export function Tile({
   title,
   action,
   delay = 0,
@@ -133,7 +135,7 @@ function EmptyState() {
 }
 
 /** A number that counts up on load (respects reduced motion via useCountUp). */
-function AnimatedNumber({
+export function AnimatedNumber({
   value,
   decimals = 0,
   prefix = "",
@@ -155,7 +157,7 @@ function AnimatedNumber({
 }
 
 /** One giant boxless number in the header band (ref-3's KPI row). */
-function BigStat({
+export function BigStat({
   icon: Icon,
   value,
   label,
@@ -191,7 +193,7 @@ function BigStat({
  * The dark jewel of the hero row: likely band as a trophy statement + the one
  * next move. (Becomes the Rank card once the leaderboard backend exists.)
  */
-function BandCard({ insight, delay }: { insight: DashboardInsight; delay: number }) {
+export function BandCard({ insight, delay }: { insight: DashboardInsight; delay: number }) {
   const nextMove = insight.study_plan[0] ?? null;
   return (
     <section
@@ -226,7 +228,7 @@ function BandCard({ insight, delay }: { insight: DashboardInsight; delay: number
 }
 
 /** Accuracy band → the shared mastery ramp (never colour alone; % always shown). */
-function accuracyColor(pct: number): string {
+export function accuracyColor(pct: number): string {
   if (pct < 50) return "var(--mastery-weak)";
   if (pct < 80) return "var(--mastery-developing)";
   return "var(--mastery-strong)";
@@ -234,7 +236,7 @@ function accuracyColor(pct: number): string {
 
 /** A compact accuracy dial that sweeps to its value on load (micro-interaction;
  *  the global reduced-motion reset collapses the transition to instant). */
-function Ring({ pct, color, size = 52, stroke = 5 }: { pct: number; color: string; size?: number; stroke?: number }) {
+export function Ring({ pct, color, size = 52, stroke = 5 }: { pct: number; color: string; size?: number; stroke?: number }) {
   const [drawn, setDrawn] = useState(false);
   useEffect(() => {
     const t = window.setTimeout(() => setDrawn(true), 80);
@@ -271,7 +273,7 @@ function Ring({ pct, color, size = 52, stroke = 5 }: { pct: number; color: strin
 }
 
 /** A quiet stat under the trajectory chart. */
-function MiniStat({ label, value }: { label: string; value: string }) {
+export function MiniStat({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="text-[15px] font-semibold text-ink" style={{ fontVariantNumeric: "tabular-nums" }}>
@@ -332,9 +334,17 @@ function SkillTable({ skills }: { skills: SkillStat[] }) {
 export function DashboardView({
   user,
   onUnauthorized,
+  onOpenLeaderboard,
+  initialAttemptId,
+  onAttemptOpened,
 }: {
   user: User;
   onUnauthorized: () => void;
+  /** Jump to the full Leaderboard page (the tile shows only top-3 + you). */
+  onOpenLeaderboard?: () => void;
+  /** Auto-open this attempt's report on mount (e.g. straight after scoring). */
+  initialAttemptId?: string | null;
+  onAttemptOpened?: () => void;
 }) {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [attempts, setAttempts] = useState<AttemptListItem[]>([]);
@@ -344,8 +354,16 @@ export function DashboardView({
   const [strategy, setStrategy] = useState<StrategyData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [openAttempt, setOpenAttempt] = useState<string | null>(null);
+  const [openAttempt, setOpenAttempt] = useState<string | null>(initialAttemptId ?? null);
   const [showSkillDetails, setShowSkillDetails] = useState(false);
+
+  // Deep-link: open a specific attempt's report (e.g. right after submitting).
+  useEffect(() => {
+    if (initialAttemptId) {
+      setOpenAttempt(initialAttemptId);
+      onAttemptOpened?.();
+    }
+  }, [initialAttemptId, onAttemptOpened]);
   const reportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -386,11 +404,13 @@ export function DashboardView({
   }, [onUnauthorized]);
 
   // Bring a freshly opened inline report into view (gently; respects reduced motion).
+  // Waits for `loading` too: arriving from "View my result" the report div only
+  // exists after the dashboard data lands, so scrolling on mount hit nothing.
   useEffect(() => {
-    if (!openAttempt) return;
+    if (!openAttempt || loading) return;
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     reportRef.current?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
-  }, [openAttempt]);
+  }, [openAttempt, loading]);
 
   if (loading) return <LoadingState />;
 
@@ -437,14 +457,17 @@ export function DashboardView({
             Your dMAT performance report, {compactNumber(summary.total_attempts)} mocks in.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-hairline bg-surface-card px-3 text-[13px] font-medium text-ink transition-colors hover:bg-surface print:hidden"
-        >
-          <Download className="size-3.5" strokeWidth={2} aria-hidden="true" />
-          Download PDF
-        </button>
+        <div className="flex items-center gap-2">
+          <ShareButton scope="dashboard" onUnauthorized={onUnauthorized} />
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-hairline bg-surface-card px-3 text-[13px] font-medium text-ink transition-colors hover:bg-surface print:hidden"
+          >
+            <Download className="size-3.5" strokeWidth={2} aria-hidden="true" />
+            Download PDF
+          </button>
+        </div>
       </div>
 
       {/* ---- Giant KPI band (boxless) ---- */}
@@ -493,9 +516,11 @@ export function DashboardView({
                 <Ring pct={s.avg_accuracy_pct} color={accuracyColor(s.avg_accuracy_pct)} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[14px] font-medium text-ink">{s.skill_name}</p>
-                  <p className="text-[12px] text-ink-secondary" style={{ fontVariantNumeric: "tabular-nums" }}>
-                    {formatMs(s.avg_time_ms)} / question
-                  </p>
+                  {s.avg_time_ms > 0 ? (
+                    <p className="text-[12px] text-ink-secondary" style={{ fontVariantNumeric: "tabular-nums" }}>
+                      {formatMs(s.avg_time_ms)} / question
+                    </p>
+                  ) : null}
                 </div>
               </li>
             ))}
@@ -509,7 +534,7 @@ export function DashboardView({
         <Tile
           title="Trajectory"
           delay={200}
-          className="lg:col-span-8"
+          className="lg:col-span-12"
           action={
             <span
               className={cn(
@@ -537,32 +562,8 @@ export function DashboardView({
         </Tile>
 
         {/* How you test */}
-        <Tile
-          title="How you test"
-          delay={240}
-          className="lg:col-span-4"
-          action={
-            strategy ? (
-              <span className="inline-flex items-center rounded-full bg-brand/12 px-2.5 py-1 text-[12px] font-semibold text-brand">
-                {strategy.dominant_archetype}
-              </span>
-            ) : undefined
-          }
-        >
-          {strategy ? (
-            <div className="flex flex-col gap-4">
-              <ErrorDonut distribution={strategy.error_distribution} />
-              <p className="border-t border-hairline pt-3 text-[13px] leading-relaxed text-ink-secondary">
-                {strategy.pacing_note}
-              </p>
-            </div>
-          ) : (
-            <p className="text-[14px] text-ink-secondary">No strategy data yet.</p>
-          )}
-        </Tile>
-
         {/* Fix these first */}
-        <Tile title="Fix these first" delay={280} className="lg:col-span-7">
+        <Tile title="Fix these first" delay={240} className="lg:col-span-7">
           {insight.persistent_strengths.length > 0 ? (
             <div className="mb-4 flex flex-wrap items-center gap-1.5">
               <span className="mr-1 text-[12px] font-medium text-ink-secondary">Strong spots</span>
@@ -579,11 +580,58 @@ export function DashboardView({
           <ReadyToFix concepts={concepts} />
         </Tile>
 
+        {/* Right column beside Fix-these-first: behaviour + compact leaderboard.
+            Stacked so the two together track its height — no hollow tiles. */}
+        <div className="flex flex-col gap-4 lg:col-span-5">
+          <Tile
+            title="How you test"
+            delay={280}
+            action={
+              strategy ? (
+                <span className="inline-flex items-center rounded-full bg-brand/12 px-2.5 py-1 text-[12px] font-semibold text-brand">
+                  {strategy.dominant_archetype}
+                </span>
+              ) : undefined
+            }
+          >
+            {strategy ? (
+              <div className="flex flex-col gap-4">
+                <ErrorDonut distribution={strategy.error_distribution} />
+                <p className="border-t border-hairline pt-3 text-[13px] leading-relaxed text-ink-secondary">
+                  {strategy.pacing_note}
+                </p>
+              </div>
+            ) : (
+              <p className="text-[14px] text-ink-secondary">No strategy data yet.</p>
+            )}
+          </Tile>
+
+          {/* Leaderboard — top-3 + you; the full list lives on its own page */}
+          <Tile
+            title="Leaderboard"
+            delay={320}
+            className="flex-1"
+            action={
+              onOpenLeaderboard ? (
+                <button
+                  type="button"
+                  onClick={onOpenLeaderboard}
+                  className="text-[13px] font-medium text-brand transition-opacity hover:opacity-70"
+                >
+                  View all →
+                </button>
+              ) : undefined
+            }
+          >
+            <LeaderboardTile limit={3} onUnauthorized={onUnauthorized} />
+          </Tile>
+        </div>
+
         {/* Attempt history */}
         <Tile
           title="Attempt history"
-          delay={320}
-          className="lg:col-span-5"
+          delay={360}
+          className="lg:col-span-12"
           action={
             <span className="text-[12px] text-ink-secondary" style={{ fontVariantNumeric: "tabular-nums" }}>
               {attempts.length} mocks
