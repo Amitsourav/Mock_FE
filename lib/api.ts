@@ -138,19 +138,30 @@ export function updateProfile(payload: ProfilePayload) {
 
 // --- Reference data for the cascading profile form -------------------------
 
+/**
+ * Launch gate: until the other catalogues have real content, only these exams
+ * (and the categories containing them) are visible anywhere in the product.
+ * The backend keeps returning everything — this is presentation-only, so
+ * clearing these sets un-hides the full catalogue with no other change.
+ */
+const LAUNCH_EXAM_CODES: ReadonlySet<string> = new Set(["DMAT"]);
+const LAUNCH_CATEGORY_CODES: ReadonlySet<string> = new Set(["STUDY_ABROAD"]);
+
 export function getStates() {
   return request<StateItem[]>("/reference/states");
 }
 
-export function getMockCategories() {
-  return request<RefItem[]>("/reference/mock-categories");
+export async function getMockCategories() {
+  const categories = await request<RefItem[]>("/reference/mock-categories");
+  return categories.filter((c) => LAUNCH_CATEGORY_CODES.has(c.code));
 }
 
 /** The Exam dropdown, dependent on the chosen mock category. Unknown code → 404. */
-export function getCategoryExams(categoryCode: string) {
-  return request<CatalogExam[]>(
+export async function getCategoryExams(categoryCode: string) {
+  const exams = await request<CatalogExam[]>(
     `/reference/mock-categories/${encodeURIComponent(categoryCode)}/exams`
   );
+  return exams.filter((e) => LAUNCH_EXAM_CODES.has(e.code));
 }
 
 export function getCountries() {
@@ -162,8 +173,9 @@ export function getCountries() {
  * exams to show a description and duration on each exam card — the cascade
  * endpoint returns neither.
  */
-export function getExamCatalog() {
-  return request<ExamSummary[]>("/exams");
+export async function getExamCatalog() {
+  const exams = await request<ExamSummary[]>("/exams");
+  return exams.filter((e) => LAUNCH_EXAM_CODES.has(e.code));
 }
 
 // --- Exam stream -----------------------------------------------------------

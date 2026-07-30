@@ -783,13 +783,10 @@ const SAT: ShowcaseExam = {
  * Order is the rotation order. dMAT leads because it is the exam we actually
  * run, and it is where reduced-motion parks.
  */
-export const EXAM_SHOWCASE: readonly ShowcaseExam[] = [
-  DMAT,
-  CAT,
-  JEE,
-  IELTS,
-  GMAT,
-  GRE,
-  TOEFL,
-  SAT,
-];
+/** The full roster, kept intact for relaunch — swap it back in when the other
+ *  exam catalogues go live. */
+const ALL_EXAMS: readonly ShowcaseExam[] = [DMAT, CAT, JEE, IELTS, GMAT, GRE, TOEFL, SAT];
+
+/** Launch gate: dMAT is the only exam we currently run, so it is the only one
+ *  the login wall advertises. Restore `ALL_EXAMS` here to bring the rotation back. */
+export const EXAM_SHOWCASE: readonly ShowcaseExam[] = ALL_EXAMS.slice(0, 1);
