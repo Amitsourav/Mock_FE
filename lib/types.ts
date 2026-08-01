@@ -176,6 +176,37 @@ export type AttemptQuestion = {
   marked_for_review: boolean;
 };
 
+/** One option in the per-question review modal. */
+export type OptionReview = {
+  id: string;
+  label: string | null;
+  content_md: string;
+  is_correct: boolean;
+  is_selected: boolean;
+};
+
+/** The full worked review of one question, opened from the per-question grid. */
+export type QuestionReview = {
+  question_no: number;
+  section_name: string | null;
+  question_type: string;
+  difficulty: string | null;
+  content_md: string;
+  stimulus_md: string | null;
+  options: OptionReview[];
+  selected_label: string | null;
+  correct_label: string | null;
+  is_correct: boolean | null;
+  error_type: ErrorType | null;
+  time_spent_ms: number | null;
+  marked_for_review: boolean;
+  skills: { code: string; name: string }[];
+  solution_md: string | null;
+  final_answer: string | null;
+  /** FALSE for old/demo attempts whose source question no longer exists. */
+  detail_available: boolean;
+};
+
 /** The qualitative insight attached to a single attempt. */
 export type AttemptInsight = {
   headline: string;

@@ -244,7 +244,11 @@ export function AttemptDetail({
           {/* Per-question grid */}
           {data.questions.length > 0 ? (
             <Panel title={`Questions (${data.questions.length})`}>
-              <QuestionGrid questions={data.questions} />
+              <QuestionGrid
+                questions={data.questions}
+                attemptId={attemptId}
+                onUnauthorized={onUnauthorized}
+              />
             </Panel>
           ) : null}
         </>

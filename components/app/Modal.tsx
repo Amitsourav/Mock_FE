@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef } from "react";
 import type { ReactNode } from "react";
+import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const FOCUSABLE =
@@ -19,6 +20,7 @@ export function Modal({
   children,
   labelledBy,
   size = "md",
+  showClose = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -27,6 +29,8 @@ export function Modal({
   children: ReactNode;
   labelledBy?: string;
   size?: "sm" | "md" | "lg";
+  /** Show an explicit ✕ close button pinned to the panel's top-right corner. */
+  showClose?: boolean;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
@@ -105,10 +109,23 @@ export function Modal({
           maxWidth
         )}
       >
+        {showClose ? (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute right-3.5 top-3.5 z-10 grid size-8 place-items-center rounded-full text-ink-secondary outline-none ring-brand transition-colors hover:bg-surface-field hover:text-ink focus-visible:ring-2"
+          >
+            <X className="size-4" strokeWidth={2} aria-hidden="true" />
+          </button>
+        ) : null}
         {title ? (
           <h2
             id={headingId}
-            className="px-6 pt-6 text-[20px] font-semibold tracking-[-0.01em] text-ink"
+            className={cn(
+              "px-6 pt-6 text-[20px] font-semibold tracking-[-0.01em] text-ink",
+              showClose && "pr-14"
+            )}
           >
             {title}
           </h2>

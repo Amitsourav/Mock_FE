@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Flag } from "lucide-react";
+import { QuestionReviewModal } from "@/components/app/dashboard/QuestionReviewModal";
 import { ERROR_TYPES, ERROR_TYPE_BY_KEY, errorTypeColor } from "@/lib/errorTypes";
 import { formatMs } from "@/lib/format";
 import type { AttemptQuestion } from "@/lib/types";
@@ -18,8 +19,17 @@ function cellStyle(key: AttemptQuestion["error_type"]): React.CSSProperties {
  * shape, not hue alone — the accessibility guarantee for the mandated palette.
  * Hover/focus reveals the concept (kc), section, timing and difficulty.
  */
-export function QuestionGrid({ questions }: { questions: AttemptQuestion[] }) {
+export function QuestionGrid({
+  questions,
+  attemptId,
+  onUnauthorized,
+}: {
+  questions: AttemptQuestion[];
+  attemptId: string;
+  onUnauthorized?: () => void;
+}) {
   const [active, setActive] = useState<number | null>(null);
+  const [openQ, setOpenQ] = useState<number | null>(null);
   const activeQ = active != null ? questions.find((q) => q.question_no === active) ?? null : null;
 
   // Only show legend entries that actually occur in this attempt.
@@ -55,9 +65,10 @@ export function QuestionGrid({ questions }: { questions: AttemptQuestion[] }) {
               onFocus={() => setActive(q.question_no)}
               onMouseLeave={() => setActive((cur) => (cur === q.question_no ? null : cur))}
               onBlur={() => setActive((cur) => (cur === q.question_no ? null : cur))}
+              onClick={() => setOpenQ(q.question_no)}
               aria-label={`Question ${q.question_no}: ${meta.label}, ${formatMs(q.time_spent_ms)}${
                 q.kc_code ? `, ${q.kc_code}` : ""
-              }${q.marked_for_review ? ", marked for review" : ""}`}
+              }${q.marked_for_review ? ", marked for review" : ""}. View full review.`}
               style={cellStyle(q.error_type)}
               className="relative flex aspect-square items-center justify-center rounded-[7px] outline-none ring-brand transition-transform focus-visible:ring-2 hover:scale-[1.08]"
             >
@@ -87,6 +98,16 @@ export function QuestionGrid({ questions }: { questions: AttemptQuestion[] }) {
           </span>
         ) : null}
       </div>
+
+      {openQ != null ? (
+        <QuestionReviewModal
+          key={openQ}
+          attemptId={attemptId}
+          questionNo={openQ}
+          onClose={() => setOpenQ(null)}
+          onUnauthorized={onUnauthorized}
+        />
+      ) : null}
     </div>
   );
 }

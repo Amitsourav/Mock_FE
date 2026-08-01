@@ -21,6 +21,7 @@ import type {
   MockTestGroups,
   Paper,
   ProfilePayload,
+  QuestionReview,
   RefItem,
   ShareLinkOut,
   SharePayload,
@@ -222,6 +223,13 @@ export function getSkills() {
 
 export function getAttemptDetail(id: string) {
   return request<AttemptDetail>(`/dashboard/attempts/${encodeURIComponent(id)}`);
+}
+
+/** One question's full review (options, verdict, worked solution) for the grid drill-down. */
+export function getQuestionReview(attemptId: string, questionNo: number) {
+  return request<QuestionReview>(
+    `/dashboard/attempts/${encodeURIComponent(attemptId)}/questions/${questionNo}`
+  );
 }
 
 // --- Dates & News ----------------------------------------------------------
