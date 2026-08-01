@@ -639,7 +639,21 @@ export function DashboardView({
           }
         >
           {attempts.length > 0 ? (
-            <AttemptsList attempts={attempts} onOpen={setOpenAttempt} />
+            <AttemptsList
+              attempts={attempts}
+              openId={openAttempt}
+              onToggle={(id) => setOpenAttempt((prev) => (prev === id ? null : id))}
+              detailRef={reportRef}
+              detail={
+                openAttempt ? (
+                  <AttemptDetail
+                    attemptId={openAttempt}
+                    onBack={() => setOpenAttempt(null)}
+                    onUnauthorized={onUnauthorized}
+                  />
+                ) : null
+              }
+            />
           ) : (
             <p className="text-[14px] text-ink-secondary">No attempts recorded.</p>
           )}
@@ -683,16 +697,6 @@ export function DashboardView({
         ) : null}
       </div>
 
-      {/* ---- Inline attempt report (full width, prints alone in attempt mode) ---- */}
-      {openAttempt ? (
-        <div ref={reportRef} className="scroll-mt-20">
-          <AttemptDetail
-            attemptId={openAttempt}
-            onBack={() => setOpenAttempt(null)}
-            onUnauthorized={onUnauthorized}
-          />
-        </div>
-      ) : null}
     </div>
   );
 }
