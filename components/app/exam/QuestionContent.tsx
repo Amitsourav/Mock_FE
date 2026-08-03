@@ -7,6 +7,16 @@ import rehypeKatex from "rehype-katex";
 import { cn } from "@/lib/utils";
 
 /**
+ * True when an option's content is nothing but a single image — a figure choice
+ * (Figure Sequences). These read best as an equal-tile grid, not stacked rows.
+ * Shared by the live player and the post-attempt review so a question looks the
+ * same in both places.
+ */
+export function isFigureOption(md: string): boolean {
+  return /^!\[[^\]]*\]\((?:data:|https?:)[^)]*\)$/.test(md.trim());
+}
+
+/**
  * Renders question content authored in Markdown + LaTeX, with inline images.
  *
  * - `$…$` / `$$…$$` → KaTeX (remark-math + rehype-katex).

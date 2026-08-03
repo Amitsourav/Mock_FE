@@ -244,7 +244,13 @@ export function AttemptDetail({
           {/* Per-question grid */}
           {data.questions.length > 0 ? (
             <Panel title={`Questions (${data.questions.length})`}>
-              <QuestionGrid questions={data.questions} />
+              {/* The review popup needs a session to fetch the paper, so the
+                  public share page (readOnly) gets the heat map alone. */}
+              <QuestionGrid
+                questions={data.questions}
+                attemptId={readOnly ? undefined : attemptId}
+                onUnauthorized={onUnauthorized}
+              />
             </Panel>
           ) : null}
         </>

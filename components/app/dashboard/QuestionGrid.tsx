@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Flag } from "lucide-react";
+import { QuestionReview } from "@/components/app/dashboard/QuestionReview";
 import { ERROR_TYPES, ERROR_TYPE_BY_KEY, errorTypeColor } from "@/lib/errorTypes";
 import { formatMs } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import type { AttemptQuestion } from "@/lib/types";
 
 /** Translucent fill + solid icon colour for an error type, theme-aware. */
@@ -17,10 +19,28 @@ function cellStyle(key: AttemptQuestion["error_type"]): React.CSSProperties {
  * and a labelled legend, so careless (amber) vs conceptual (red) is separable by
  * shape, not hue alone — the accessibility guarantee for the mandated palette.
  * Hover/focus reveals the concept (kc), section, timing and difficulty.
+ *
+ * With an `attemptId`, every cell also opens the full question review. It is
+ * omitted on the public share page, which has no session to fetch the paper
+ * with — there the grid stays a read-only heat map, exactly as before.
  */
-export function QuestionGrid({ questions }: { questions: AttemptQuestion[] }) {
+export function QuestionGrid({
+  questions,
+  attemptId,
+  onUnauthorized,
+}: {
+  questions: AttemptQuestion[];
+  /** Enables the review popup. Absent → cells are not clickable. */
+  attemptId?: string;
+  onUnauthorized?: () => void;
+}) {
   const [active, setActive] = useState<number | null>(null);
+  const [openNo, setOpenNo] = useState<number | null>(null);
   const activeQ = active != null ? questions.find((q) => q.question_no === active) ?? null : null;
+  const reviewable = Boolean(attemptId);
+
+  const closeReview = useCallback(() => setOpenNo(null), []);
+  const noop = useCallback(() => {}, []);
 
   // Only show legend entries that actually occur in this attempt.
   const present = new Set(questions.map((q) => q.error_type));
@@ -40,6 +60,11 @@ export function QuestionGrid({ questions }: { questions: AttemptQuestion[] }) {
             {label}
           </span>
         ))}
+        {reviewable ? (
+          <span className="ml-auto text-[12px] font-medium text-brand">
+            Select any question to review it
+          </span>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-[repeat(auto-fill,minmax(34px,1fr))] gap-1.5">
@@ -55,11 +80,18 @@ export function QuestionGrid({ questions }: { questions: AttemptQuestion[] }) {
               onFocus={() => setActive(q.question_no)}
               onMouseLeave={() => setActive((cur) => (cur === q.question_no ? null : cur))}
               onBlur={() => setActive((cur) => (cur === q.question_no ? null : cur))}
+              onClick={reviewable ? () => setOpenNo(q.question_no) : undefined}
+              aria-haspopup={reviewable ? "dialog" : undefined}
               aria-label={`Question ${q.question_no}: ${meta.label}, ${formatMs(q.time_spent_ms)}${
                 q.kc_code ? `, ${q.kc_code}` : ""
-              }${q.marked_for_review ? ", marked for review" : ""}`}
+              }${q.marked_for_review ? ", marked for review" : ""}${
+                reviewable ? ". Open review" : ""
+              }`}
               style={cellStyle(q.error_type)}
-              className="relative flex aspect-square items-center justify-center rounded-[7px] outline-none ring-brand transition-transform focus-visible:ring-2 hover:scale-[1.08]"
+              className={cn(
+                "relative flex aspect-square items-center justify-center rounded-[7px] outline-none ring-brand transition-transform focus-visible:ring-2 hover:scale-[1.08]",
+                reviewable ? "cursor-pointer" : "cursor-default"
+              )}
             >
               <Icon className="size-3.5" strokeWidth={3} aria-hidden="true" />
               {q.marked_for_review ? (
@@ -87,6 +119,17 @@ export function QuestionGrid({ questions }: { questions: AttemptQuestion[] }) {
           </span>
         ) : null}
       </div>
+
+      {attemptId ? (
+        <QuestionReview
+          attemptId={attemptId}
+          questions={questions}
+          openNo={openNo}
+          onNavigate={setOpenNo}
+          onClose={closeReview}
+          onUnauthorized={onUnauthorized ?? noop}
+        />
+      ) : null}
     </div>
   );
 }

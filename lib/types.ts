@@ -176,6 +176,52 @@ export type AttemptQuestion = {
   marked_for_review: boolean;
 };
 
+/**
+ * One option as it appears in a REVIEW (a submitted, scored attempt). Unlike
+ * `PaperOption` this carries `is_correct` — the answer key is only ever exposed
+ * after submission, never from the live paper.
+ */
+export type ReviewOption = {
+  id: string;
+  label: string | null;
+  content_md: string;
+  position: number;
+  is_correct: boolean;
+};
+
+/**
+ * A single question re-opened from a finished attempt: the paper content, the
+ * answer key, and what the student actually did. Fetched lazily per question —
+ * option images arrive as base64 data URIs, so 76 of these in one payload would
+ * be far heavier than the attempt report needs.
+ *
+ * 🔴 Backend: `GET /dashboard/attempts/{id}/questions/{question_no}`. The UI
+ * degrades to the metadata it already has from `AttemptQuestion` when this 404s,
+ * so shipping the frontend ahead of the endpoint is safe.
+ */
+export type AttemptQuestionReview = {
+  question_no: number;
+  section_name: string;
+  skill_name: string | null;
+  kc_code: string | null;
+  kc_name: string | null;
+  difficulty: string | null;
+  question_type: string;
+  content_md: string;
+  stimulus_md: string | null;
+  options: ReviewOption[];
+  /** Null when the question was left unattempted. */
+  selected_option_id: string | null;
+  /** Redundant with `options[].is_correct`; either source is accepted. */
+  correct_option_id: string | null;
+  error_type: ErrorType;
+  is_correct: boolean;
+  time_spent_ms: number;
+  marked_for_review: boolean;
+  /** Authored/AI worked solution. Rendered only when present. */
+  explanation_md?: string | null;
+};
+
 /** The qualitative insight attached to a single attempt. */
 export type AttemptInsight = {
   headline: string;

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
@@ -26,11 +27,14 @@ export function Modal({
   title?: ReactNode;
   children: ReactNode;
   labelledBy?: string;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
   const headingId = useId();
+  // `document` only exists after hydration; the portal target is read then.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     if (!open) return;
@@ -80,12 +84,27 @@ export function Modal({
     };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
   const maxWidth =
-    size === "sm" ? "max-w-[380px]" : size === "lg" ? "max-w-[720px]" : "max-w-[480px]";
+    size === "sm"
+      ? "max-w-[380px]"
+      : size === "lg"
+        ? "max-w-[720px]"
+        : size === "xl"
+          ? "max-w-[1040px]"
+          : "max-w-[480px]";
 
-  return (
+  /**
+   * Portalled to <body> deliberately. `position: fixed` is resolved against the
+   * nearest ancestor with a transform, filter, backdrop-filter, will-change or
+   * contain — and this app is full of them (`.glass-tile` carries a
+   * backdrop-filter, `.reveal` animates a transform). Rendered in place, a
+   * dialog opened from inside a glass tile centres itself on THAT TILE and
+   * drifts with the page scroll instead of covering the viewport. Escaping to
+   * <body> is the only way `inset-0` reliably means "the screen".
+   */
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-6"
       // Backdrop: click outside the panel dismisses.
@@ -115,6 +134,7 @@ export function Modal({
         ) : null}
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

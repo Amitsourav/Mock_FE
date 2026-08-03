@@ -435,6 +435,30 @@ body {
   animation: shake 240ms ease-out;
 }
 
+/* --- Examiner's stamp (question review) -----------------------------------
+   The verdict badge lands like a rubber stamp on a marked script: it arrives
+   oversized and slightly rotated, then settles square. One accent moment per
+   question — the rest of the review sheet stays still.
+-------------------------------------------------------------------------- */
+@keyframes stamp-in {
+  from {
+    opacity: 0;
+    transform: scale(1.5) rotate(-7deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.96) rotate(1.5deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+.animate-stamp {
+  animation: stamp-in 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
 .animate-spin-slow {
   animation: spin 700ms linear infinite;
 }

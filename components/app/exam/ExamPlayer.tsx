@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/Button";
 import { Modal } from "@/components/app/Modal";
-import { QuestionContent } from "@/components/app/exam/QuestionContent";
+import { QuestionContent, isFigureOption } from "@/components/app/exam/QuestionContent";
 import { PaletteLegend, QuestionPalette } from "@/components/app/exam/QuestionPalette";
 import { useExamIntegrity } from "@/components/app/exam/useExamIntegrity";
 import {
@@ -678,12 +678,6 @@ export function ExamPlayer({
       </Modal>
     </div>
   );
-}
-
-/** True when an option's content is nothing but a single image — a figure choice
- *  (Figure Sequences). These read best as an equal-tile grid, not stacked rows. */
-function isFigureOption(md: string): boolean {
-  return /^!\[[^\]]*\]\((?:data:|https?:)[^)]*\)$/.test(md.trim());
 }
 
 function Centered({ children }: { children: React.ReactNode }) {

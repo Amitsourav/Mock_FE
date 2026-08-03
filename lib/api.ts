@@ -4,6 +4,7 @@ import type {
   AnabinInstitution,
   AttemptDetail,
   AttemptListItem,
+  AttemptQuestionReview,
   AttemptState,
   CatalogExam,
   CollegePrediction,
@@ -222,6 +223,19 @@ export function getSkills() {
 
 export function getAttemptDetail(id: string) {
   return request<AttemptDetail>(`/dashboard/attempts/${encodeURIComponent(id)}`);
+}
+
+/**
+ * One question from a scored attempt, with the answer key and the student's
+ * pick — the review popup's payload. Fetched per question, not in bulk: option
+ * figures are inline base64, so the whole paper would dwarf the report itself.
+ * 404 (endpoint or question absent) is handled by the caller as "content
+ * unavailable", not as an error.
+ */
+export function getQuestionReview(attemptId: string, questionNo: number) {
+  return request<AttemptQuestionReview>(
+    `/dashboard/attempts/${encodeURIComponent(attemptId)}/questions/${questionNo}`
+  );
 }
 
 // --- Dates & News ----------------------------------------------------------
