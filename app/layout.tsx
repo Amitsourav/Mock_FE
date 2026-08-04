@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces } from "next/font/google";
+import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
+import { PageViewTracker } from "@/components/analytics/PageViewTracker";
 import "./globals.css";
 // KaTeX styles for the exam player's LaTeX rendering — imported once, app-wide.
 import "katex/dist/katex.min.css";
@@ -35,7 +37,11 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={fraunces.variable}>
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        {children}
+        <GoogleAnalytics />
+        <PageViewTracker />
+      </body>
     </html>
   );
 }

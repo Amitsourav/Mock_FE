@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AppActionsProvider } from "@/components/app/app-context";
+import type { MockLaunchMeta } from "@/components/app/app-context";
 import { ComingSoonModal } from "@/components/app/ComingSoonModal";
 import { MobileNav, Sidebar } from "@/components/app/Sidebar";
 import type { AppView } from "@/components/app/Sidebar";
@@ -14,6 +15,7 @@ import { DatesNewsView } from "@/components/app/DatesNewsView";
 import { MockTestView } from "@/components/app/mocks/MockTestView";
 import { ExamPlayer } from "@/components/app/exam/ExamPlayer";
 import { ApiError, getStream } from "@/lib/api";
+import { trackPageView } from "@/lib/analytics";
 import type { StreamOut, User } from "@/lib/types";
 
 const VIEW_TITLE: Record<AppView, string> = {
@@ -41,6 +43,8 @@ export function AppShell({
 }) {
   const [view, setView] = useState<AppView>("dashboard");
   const [examId, setExamId] = useState<string | null>(null);
+  // Carried from the mock card that launched the test, for the mock_* events.
+  const [examMeta, setExamMeta] = useState<MockLaunchMeta | null>(null);
   // The scored attempt to auto-open on the dashboard after a submit.
   const [resultAttemptId, setResultAttemptId] = useState<string | null>(null);
   const [comingSoonOpen, setComingSoonOpen] = useState(false);
@@ -72,9 +76,18 @@ export function AppShell({
     };
   }, [onUnauthorized]);
 
+  // These screens are React state, not routes — the URL never changes — so GA4
+  // would otherwise see one page_view for the entire session. Virtual paths give
+  // each screen its own page in reports. The automatic page_view is off, and
+  // real navigations are handled by PageViewTracker, so nothing double-counts.
+  useEffect(() => {
+    trackPageView(`/app/${view}`, `${VIEW_TITLE[view]} — dMAT Mock`);
+  }, [view]);
+
   const openComingSoon = useCallback(() => setComingSoonOpen(true), []);
-  const openExam = useCallback((examinationId: string) => {
+  const openExam = useCallback((examinationId: string, meta?: MockLaunchMeta) => {
     setExamId(examinationId);
+    setExamMeta(meta ?? null);
     setView("exam");
   }, []);
   const exitExam = useCallback(() => {
@@ -108,6 +121,7 @@ export function AppShell({
     return (
       <ExamPlayer
         examinationId={examId}
+        meta={examMeta}
         onExit={exitExam}
         onViewResult={viewResult}
         onUnauthorized={onUnauthorized}

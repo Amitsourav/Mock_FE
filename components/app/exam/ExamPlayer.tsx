@@ -26,6 +26,8 @@ import {
   startAttempt,
   submitAttempt,
 } from "@/lib/api";
+import { trackMockComplete, trackMockStart } from "@/lib/analytics";
+import type { MockLaunchMeta } from "@/components/app/app-context";
 import { formatClock, formatDuration } from "@/lib/format";
 import type { Paper, PaperQuestion } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -49,11 +51,14 @@ type Phase =
  */
 export function ExamPlayer({
   examinationId,
+  meta,
   onExit,
   onViewResult,
   onUnauthorized,
 }: {
   examinationId: string;
+  /** Mock identity for analytics; null when launched without a card context. */
+  meta?: MockLaunchMeta | null;
   onExit: () => void;
   onViewResult?: (resultId: string) => void;
   onUnauthorized: () => void;
@@ -76,6 +81,14 @@ export function ExamPlayer({
   // Lets doSubmit exit fullscreen without a hook-ordering cycle.
   const exitFullscreenRef = useRef<() => void>(() => {});
 
+  // Analytics snapshots. doSubmit is declared before `paper`/`answers` exist in
+  // render order, so it reads these refs rather than closing over stale state.
+  const metaRef = useRef<MockLaunchMeta | null>(meta ?? null);
+  metaRef.current = meta ?? null;
+  const startedRef = useRef(false);
+  const beganAtRef = useRef(0);
+  const statsRef = useRef({ answered: 0, total: 0, remaining: 0 });
+
   // --- Submit (manual or auto at expiry) -----------------------------------
   const doSubmit = useCallback(
     async (auto: boolean) => {
@@ -87,6 +100,24 @@ export function ExamPlayer({
       setPhase({ name: "submitting" });
       try {
         const res = await submitAttempt(attemptIdRef.current);
+        const { answered, total, remaining } = statsRef.current;
+        const allowance = metaRef.current?.duration_seconds ?? 0;
+        trackMockComplete({
+          mock_id: metaRef.current?.mock_id ?? attemptIdRef.current,
+          // Elapsed from the paper's own allowance, so a resumed attempt counts
+          // the time spent before the reload too. Falls back to wall-clock in
+          // this session when the allowance wasn't passed in.
+          duration_sec:
+            allowance > 0
+              ? Math.max(0, Math.round(allowance - remaining))
+              : beganAtRef.current > 0
+                ? Math.round((Date.now() - beganAtRef.current) / 1000)
+                : 0,
+          completion_rate: total > 0 ? Math.round((answered / total) * 1000) / 10 : 0,
+          // Submit does not return a score (scoring is async) — passed through
+          // only if the backend starts sending one.
+          score: typeof res.score === "number" ? res.score : undefined,
+        });
         setPhase({ name: "submitted", message: res.message || SUBMIT_FALLBACK, resultId: res.result_id });
       } catch (error) {
         if (error instanceof ApiError && error.unauthorized) {
@@ -124,7 +155,18 @@ export function ExamPlayer({
   const beginExam = useCallback(() => {
     integrity.enterFullscreen();
     setPhase({ name: "playing" });
-  }, [integrity]);
+    // The mock "actually begins" here — the paper is live and the clock is the
+    // student's. Guarded so re-entering fullscreen can't re-fire it.
+    if (!startedRef.current) {
+      startedRef.current = true;
+      beganAtRef.current = Date.now();
+      trackMockStart({
+        mock_id: metaRef.current?.mock_id ?? examinationId,
+        mock_name: metaRef.current?.mock_name ?? "Unknown mock",
+        access: metaRef.current?.access ?? "free",
+      });
+    }
+  }, [integrity, examinationId]);
 
   // --- Start / resume, then load the paper ---------------------------------
   useEffect(() => {
@@ -200,6 +242,16 @@ export function ExamPlayer({
     const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
   }, [phase.name, doSubmit]);
+
+  // Keep the analytics snapshot current for doSubmit (auto-submit at expiry can
+  // fire from the countdown, outside any render that has these values).
+  useEffect(() => {
+    statsRef.current = {
+      answered: Object.keys(answers).length,
+      total: paper?.total_questions ?? 0,
+      remaining,
+    };
+  }, [answers, paper, remaining]);
 
   // --- Mark the current question visited (drives the palette's "not visited" state) ---
   useEffect(() => {

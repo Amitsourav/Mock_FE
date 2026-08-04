@@ -16,6 +16,7 @@ import {
   getStates,
   updateProfile,
 } from "@/lib/api";
+import { trackMockSignup } from "@/lib/analytics";
 import { formatDuration } from "@/lib/format";
 import {
   COUNTRIES,
@@ -177,6 +178,9 @@ export function OnboardingWizard({
         catalog_exam_code: examCode,
         target_country_code: requiresCountry ? countryCode : null,
       });
+      // Registration complete. Auth itself is a passwordless OTP, so completing
+      // this profile IS the account-creation step for this product.
+      trackMockSignup();
       setWelcomeUser(updated);
     } catch (error) {
       if (error instanceof ApiError && error.unauthorized) {

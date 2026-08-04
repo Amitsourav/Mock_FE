@@ -3,6 +3,7 @@
 import { Clock, ListChecks, SignalHigh } from "lucide-react";
 import { Button } from "@/components/Button";
 import { useAppActions } from "@/components/app/app-context";
+import { mockAccess } from "@/lib/analytics";
 import { formatDuration } from "@/lib/format";
 import type { MockTest } from "@/lib/types";
 
@@ -55,7 +56,12 @@ export function MockCard({ mock }: { mock: MockTest }) {
           type="button"
           onClick={() =>
             playable && mock.examination_id
-              ? openExam(mock.examination_id)
+              ? openExam(mock.examination_id, {
+                  mock_id: mock.id,
+                  mock_name: mock.title,
+                  access: mockAccess(),
+                  duration_seconds: mock.duration_seconds,
+                })
               : openComingSoon()
           }
           className="h-[44px] text-[15px]"

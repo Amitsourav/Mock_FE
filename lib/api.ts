@@ -392,9 +392,14 @@ export function saveAnswer(
   );
 }
 
-/** Finalise + score the attempt. Returns `result_id` (the scored report to open). */
+/**
+ * Finalise + score the attempt. Returns `result_id` (the scored report to open).
+ * `score` is NOT returned today — scoring is asynchronous — but it is declared
+ * optional so the `mock_complete` event can carry it the moment the backend
+ * starts sending one, with no further frontend change.
+ */
 export function submitAttempt(attemptId: string) {
-  return request<{ status: string; message: string; result_id?: string | null }>(
+  return request<{ status: string; message: string; result_id?: string | null; score?: number | null }>(
     `/attempts/${encodeURIComponent(attemptId)}/submit`,
     { method: "POST" }
   );
